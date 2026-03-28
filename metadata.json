@@ -1,0 +1,7 @@
+{
+  "name": "Early Diet Advisor",
+  "description": "Personalized early diet recommendations based on your profile and AI food analysis.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

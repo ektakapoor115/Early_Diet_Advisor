@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Playfair Display", "Georgia", serif;
+  --font-sans: "Inter", "Helvetica Neue", sans-serif;
+}
+
+@layer utilities {
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer base {
+  /* Fix for html2canvas oklab/oklch error in Tailwind v4 */
+  #diet-report, [id^="recipe-"] {
+    color: #1A1A1A !important;
+    background-color: #ffffff !important;
+    border-color: #E6E6E6 !important;
+  }
+  
+  #diet-report *, [id^="recipe-"] * {
+    border-color: inherit;
+  }
+
+  .markdown-content h1 {
+    @apply text-2xl font-serif italic mb-4 mt-8;
+  }
+  .markdown-content h2 {
+    @apply text-xl font-serif italic mb-3 mt-6;
+  }
+  .markdown-content h3 {
+    @apply text-lg font-serif italic mb-2 mt-4;
+  }
+  .markdown-content p {
+    @apply mb-4 text-[#1A1A1A]/70 leading-relaxed;
+  }
+  .markdown-content ul {
+    @apply list-disc list-inside mb-4 space-y-2 text-[#1A1A1A]/70;
+  }
+  .markdown-content ol {
+    @apply list-decimal list-inside mb-4 space-y-2 text-[#1A1A1A]/70;
+  }
+  .markdown-content strong {
+    @apply font-bold text-[#1A1A1A];
+  }
+}
