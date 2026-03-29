@@ -500,28 +500,6 @@ export default function App() {
     }
   };
 
-  const handleGenerateAiFoodImage = async (foodName: string) => {
-    if (aiImages[foodName] || isGeneratingAiImage[foodName]) return;
-    
-    setIsGeneratingAiImage(prev => ({ ...prev, [foodName]: true }));
-    try {
-      const imageUrl = await generateFoodImage(foodName);
-      setAiImages(prev => ({ ...prev, [foodName]: imageUrl }));
-    } catch (error) {
-      console.error("Error generating AI image:", error);
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      if (errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
-        const now = Date.now();
-        if (now - lastQuotaErrorTime.current > 10000) { // Throttle alerts to once every 10 seconds
-          lastQuotaErrorTime.current = now;
-          setQuotaModalOpen(true);
-        }
-      }
-    } finally {
-      setIsGeneratingAiImage(prev => ({ ...prev, [foodName]: false }));
-    }
-  };
-
   const handleAnalyzeNutrition = async (recipe: Recipe, imageUrl: string) => {
     if (isAnalyzingNutrition[recipe.id]) return;
     
@@ -664,13 +642,6 @@ export default function App() {
       localStorage.setItem("diet_advisor_plan_history", JSON.stringify(newHistory));
 
       setActiveTab("plan");
-      
-      // Auto-generate first 3 AI images to show quality
-      if (plan.recommendedFoods) {
-        plan.recommendedFoods.slice(0, 3).forEach(food => {
-          handleGenerateAiFoodImage(food.name);
-        });
-      }
     } catch (error) {
       console.error("Error generating plan:", error);
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -1497,19 +1468,59 @@ export default function App() {
                           </div>
                         )}
                         {!isGeneratingPlan && dietPlan && (
-                      <div className="space-y-12">
-                        <div className="markdown-content prose prose-sm max-w-none prose-headings:font-serif prose-headings:italic prose-headings:font-normal prose-p:text-slate-600 prose-p:leading-relaxed prose-li:text-slate-600">
-                          <ReactMarkdown
-                            components={{
-                              h3: ({node, ...props}) => {
-                                const isWarning = props.children?.toString().includes('⚠️');
-                                return <h3 className={isWarning ? 'warning-heading' : ''} {...props} />;
-                              }
-                            }}
-                          >
-                            {dietPlan.planMarkdown}
-                          </ReactMarkdown>
-                        </div>
+                          <div className="space-y-12">
+                            <div className="markdown-content prose prose-sm max-w-none prose-headings:font-sans prose-headings:font-bold prose-headings:tracking-tight prose-p:text-slate-600 prose-p:leading-relaxed prose-li:text-slate-600 prose-table:border-collapse prose-table:w-full prose-th:bg-slate-50 prose-th:p-3 prose-th:text-left prose-th:text-xs prose-th:font-bold prose-th:uppercase prose-th:tracking-wider prose-td:p-3 prose-td:border-t prose-td:border-slate-100 prose-td:text-sm">
+                              <ReactMarkdown
+                                components={{
+                                  h1: ({node, ...props}) => <h1 className="text-3xl flex items-center gap-3 mb-6 text-slate-900 border-b pb-4" {...props}><Sparkles className="w-8 h-8 text-emerald-600" /> {props.children}</h1>,
+                                  h2: ({node, ...props}) => <h2 className="text-2xl flex items-center gap-2 mt-10 mb-4 text-slate-800" {...props}><Target className="w-6 h-6 text-emerald-500" /> {props.children}</h2>,
+                                  h3: ({node, ...props}) => {
+                                    const content = props.children?.toString() || "";
+                                    const isWarning = content.includes('⚠️') || content.toLowerCase().includes('warning') || content.toLowerCase().includes('advice');
+                                    const isMeal = content.toLowerCase().includes('meal') || content.toLowerCase().includes('breakfast') || content.toLowerCase().includes('lunch') || content.toLowerCase().includes('dinner') || content.toLowerCase().includes('snack');
+                                    const isNutrition = content.toLowerCase().includes('nutrition');
+                                    
+                                    let Icon = Info;
+                                    let iconColor = "text-slate-400";
+                                    
+                                    if (isWarning) {
+                                      Icon = AlertTriangle;
+                                      iconColor = "text-red-500";
+                                    } else if (isMeal) {
+                                      Icon = Utensils;
+                                      iconColor = "text-orange-500";
+                                    } else if (isNutrition) {
+                                      Icon = Activity;
+                                      iconColor = "text-blue-500";
+                                    }
+
+                                    return (
+                                      <h3 className={cn("text-xl flex items-center gap-2 mt-8 mb-3 text-slate-800", isWarning && "warning-heading p-3 bg-red-50/50 rounded-xl border-l-4 border-red-500")} {...props}>
+                                        <Icon className={cn("w-5 h-5", iconColor)} />
+                                        {props.children}
+                                      </h3>
+                                    );
+                                  },
+                                  table: ({node, ...props}) => (
+                                    <div className="my-6 overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-white">
+                                      <table className="w-full border-collapse" {...props} />
+                                    </div>
+                                  ),
+                                  thead: ({node, ...props}) => <thead className="bg-slate-50/80 border-b border-slate-200" {...props} />,
+                                  th: ({node, ...props}) => <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500" {...props} />,
+                                  td: ({node, ...props}) => <td className="px-4 py-3 text-sm text-slate-600 border-b border-slate-50 last:border-0" {...props} />,
+                                  ul: ({node, ...props}) => <ul className="space-y-2 my-4 list-none pl-0" {...props} />,
+                                  li: ({node, ...props}) => (
+                                    <li className="flex gap-3 items-start group" {...props}>
+                                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500/40 group-hover:bg-emerald-500 shrink-0 transition-colors" />
+                                      <span className="flex-1">{props.children}</span>
+                                    </li>
+                                  )
+                                }}
+                              >
+                                {dietPlan.planMarkdown}
+                              </ReactMarkdown>
+                            </div>
 
                         <div className="p-4 bg-red-50/30 border border-red-100 rounded-2xl flex gap-3 mt-8">
                           <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
@@ -1523,58 +1534,38 @@ export default function App() {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center">
-                                  <Sparkles className="text-white w-4 h-4" />
+                                  <Layers className="text-white w-4 h-4" />
                                 </div>
-                                <h3 className="text-2xl font-sans font-semibold tracking-tight text-slate-900">Recommended Foods Gallery</h3>
+                                <h3 className="text-2xl font-sans font-semibold tracking-tight text-slate-900">Recommended Food Items</h3>
                               </div>
                               <div className="flex items-center gap-4">
-                                <span className="text-xs font-medium tracking-wide opacity-30">AI Generated Reference</span>
+                                <span className="text-xs font-medium tracking-wide opacity-30">Reference Placeholders</span>
                               </div>
                             </div>
                             <p className="text-sm opacity-40 max-w-md">
-                              Click on any food item to generate a high-quality AI reference image. We've automatically generated the first 3 for you.
+                              These are the key food items recommended for your specific profile and location.
                             </p>
                             
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                               {dietPlan.recommendedFoods.map((food, idx) => (
                                 <motion.div 
                                   key={idx}
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  transition={{ delay: idx * 0.01 }}
-                                  className="group relative aspect-square bg-white shadow-sm rounded-2xl border border-slate-200 rounded-2xl overflow-hidden cursor-pointer"
-                                  onClick={() => handleGenerateAiFoodImage(food.name)}
+                                  initial={{ opacity: 0, scale: 0.95 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: idx * 0.05 }}
+                                  className="group relative aspect-square bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden flex flex-col items-center justify-center p-4 text-center hover:bg-white hover:shadow-md transition-all duration-300"
                                 >
-                                  {aiImages[food.name] ? (
-                                    <img 
-                                      src={aiImages[food.name]}
-                                      alt={food.name}
-                                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                                      referrerPolicy="no-referrer"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center space-y-2">
-                                      {isGeneratingAiImage[food.name] ? (
-                                        <Loader2 className="w-5 h-5 animate-spin opacity-20" />
-                                      ) : (
-                                        <div className="flex flex-col items-center gap-2">
-                                          <Camera className="w-4 h-4 opacity-10 group-hover:opacity-40 transition-opacity" />
-                                          <span className="text-[10px] font-semibold tracking-wide uppercase opacity-20 group-hover:opacity-60 transition-opacity">
-                                            {aiImages[food.name] === undefined && isGeneratingAiImage[food.name] === false && lastQuotaErrorTime.current > 0 ? "Retry AI Image" : "Generate AI Image"}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                                    <span className="text-[8px] text-white/60 uppercase tracking-widest font-bold mb-1">Item {idx + 1}</span>
-                                    <p className="text-[10px] text-white font-medium leading-tight">{food.name}</p>
+                                  <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                    <Utensils className="w-6 h-6 text-emerald-600" />
+                                  </div>
+                                  <p className="text-xs font-semibold text-slate-700 leading-tight">{food.name}</p>
+                                  <div className="mt-2 px-2 py-0.5 bg-slate-200/50 rounded-full">
+                                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Item {idx + 1}</span>
                                   </div>
                                   
-                                  {aiImages[food.name] && (
-                                    <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                                  )}
+                                  <div className="absolute top-2 right-2">
+                                    <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full opacity-40" />
+                                  </div>
                                 </motion.div>
                               ))}
                             </div>
@@ -1582,21 +1573,18 @@ export default function App() {
                         )}
                       </div>
                     )}
-                    {!isGeneratingRecipe && currentRecipe && (
-                      <div className="mt-12">
-                        <h3 className="text-2xl font-sans font-semibold tracking-tight text-slate-900 mb-6">Featured Recipe</h3>
-                        <RecipeCard 
-                          recipe={currentRecipe} 
-                          isFavorite={favorites.some(f => f.id === currentRecipe.id)}
-                          onToggleFavorite={toggleFavorite}
-                          imageUrl={aiImages[currentRecipe.title]}
-                          onGenerateImage={handleGenerateAiFoodImage}
-                          isGeneratingImage={isGeneratingAiImage[currentRecipe.title]}
-                          onAnalyzeNutrition={handleAnalyzeNutrition}
-                          isAnalyzingNutrition={isAnalyzingNutrition[currentRecipe.id]}
-                        />
-                      </div>
-                    )}
+                        {!isGeneratingRecipe && currentRecipe && (
+                          <div className="mt-12">
+                            <h3 className="text-2xl font-sans font-semibold tracking-tight text-slate-900 mb-6">Featured Recipe</h3>
+                            <RecipeCard 
+                              recipe={currentRecipe} 
+                              isFavorite={favorites.some(f => f.id === currentRecipe.id)}
+                              onToggleFavorite={toggleFavorite}
+                              onAnalyzeNutrition={handleAnalyzeNutrition}
+                              isAnalyzingNutrition={isAnalyzingNutrition[currentRecipe.id]}
+                            />
+                          </div>
+                        )}
                   </div>
                 </>
               )}
@@ -1675,13 +1663,53 @@ export default function App() {
                             ← Analyze Another
                           </button>
                         </div>
-                        <div className="bg-white shadow-sm rounded-2xl p-8 border border-slate-100 rounded-2xl markdown-content">
+                        <div className="bg-white shadow-sm rounded-2xl p-8 border border-slate-100 rounded-2xl markdown-content prose prose-sm max-w-none prose-headings:font-sans prose-headings:font-bold prose-headings:tracking-tight prose-p:text-slate-600 prose-p:leading-relaxed prose-li:text-slate-600 prose-table:border-collapse prose-table:w-full prose-th:bg-slate-50 prose-th:p-3 prose-th:text-left prose-th:text-xs prose-th:font-bold prose-th:uppercase prose-th:tracking-wider prose-td:p-3 prose-td:border-t prose-td:border-slate-100 prose-td:text-sm">
                           <ReactMarkdown
                             components={{
+                              h1: ({node, ...props}) => <h1 className="text-3xl flex items-center gap-3 mb-6 text-slate-900 border-b pb-4" {...props}><Sparkles className="w-8 h-8 text-emerald-600" /> {props.children}</h1>,
+                              h2: ({node, ...props}) => <h2 className="text-2xl flex items-center gap-2 mt-10 mb-4 text-slate-800" {...props}><Target className="w-6 h-6 text-emerald-500" /> {props.children}</h2>,
                               h3: ({node, ...props}) => {
-                                const isWarning = props.children?.toString().includes('⚠️');
-                                return <h3 className={isWarning ? 'warning-heading' : ''} {...props} />;
-                              }
+                                const content = props.children?.toString() || "";
+                                const isWarning = content.includes('⚠️') || content.toLowerCase().includes('warning') || content.toLowerCase().includes('advice');
+                                const isMeal = content.toLowerCase().includes('meal') || content.toLowerCase().includes('breakfast') || content.toLowerCase().includes('lunch') || content.toLowerCase().includes('dinner') || content.toLowerCase().includes('snack');
+                                const isNutrition = content.toLowerCase().includes('nutrition');
+                                
+                                let Icon = Info;
+                                let iconColor = "text-slate-400";
+                                
+                                if (isWarning) {
+                                  Icon = AlertTriangle;
+                                  iconColor = "text-red-500";
+                                } else if (isMeal) {
+                                  Icon = Utensils;
+                                  iconColor = "text-orange-500";
+                                } else if (isNutrition) {
+                                  Icon = Activity;
+                                  iconColor = "text-blue-500";
+                                }
+
+                                return (
+                                  <h3 className={cn("text-xl flex items-center gap-2 mt-8 mb-3 text-slate-800", isWarning && "warning-heading p-3 bg-red-50/50 rounded-xl border-l-4 border-red-500")} {...props}>
+                                    <Icon className={cn("w-5 h-5", iconColor)} />
+                                    {props.children}
+                                  </h3>
+                                );
+                              },
+                              table: ({node, ...props}) => (
+                                <div className="my-6 overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-white">
+                                  <table className="w-full border-collapse" {...props} />
+                                </div>
+                              ),
+                              thead: ({node, ...props}) => <thead className="bg-slate-50/80 border-b border-slate-200" {...props} />,
+                              th: ({node, ...props}) => <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500" {...props} />,
+                              td: ({node, ...props}) => <td className="px-4 py-3 text-sm text-slate-600 border-b border-slate-50 last:border-0" {...props} />,
+                              ul: ({node, ...props}) => <ul className="space-y-2 my-4 list-none pl-0" {...props} />,
+                              li: ({node, ...props}) => (
+                                <li className="flex gap-3 items-start group" {...props}>
+                                  <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500/40 group-hover:bg-emerald-500 shrink-0 transition-colors" />
+                                  <span className="flex-1">{props.children}</span>
+                                </li>
+                              )
                             }}
                           >
                             {nutritionInfo}
@@ -1745,9 +1773,6 @@ export default function App() {
                               recipe={recipe}
                               isFavorite={true}
                               onToggleFavorite={toggleFavorite}
-                              imageUrl={aiImages[recipe.title]}
-                              onGenerateImage={handleGenerateAiFoodImage}
-                              isGeneratingImage={isGeneratingAiImage[recipe.title]}
                               onAnalyzeNutrition={handleAnalyzeNutrition}
                               isAnalyzingNutrition={isAnalyzingNutrition[recipe.id]}
                             />

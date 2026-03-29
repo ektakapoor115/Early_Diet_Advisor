@@ -1,5 +1,5 @@
 import React from "react";
-import { Clock, Utensils, BookOpen, Heart, Sparkles, Loader2, Download } from "lucide-react";
+import { Clock, Utensils, BookOpen, Heart, Sparkles, Loader2, Download, Activity } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 
@@ -59,122 +59,102 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
           <Download className="w-4 h-4" />
         </button>
       </div>
-      {imageUrl && (
-        <div className="aspect-video w-full overflow-hidden border-b border-slate-200">
-          <img 
-            src={imageUrl} 
-            alt={recipe.title} 
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-            referrerPolicy="no-referrer"
-          />
+      <div className="aspect-video w-full bg-slate-50 border-b border-slate-200 flex flex-col items-center justify-center p-8 relative overflow-hidden group/img">
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent" />
+        <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4 relative z-10 group-hover/img:scale-110 transition-transform duration-500">
+          <Utensils className="w-8 h-8 text-emerald-600" />
         </div>
-      )}
-      
-      {!imageUrl && onGenerateImage && (
-        <div 
-          className="aspect-video w-full bg-slate-50 border-b border-slate-200 flex flex-col items-center justify-center p-8 cursor-pointer group/img"
-          onClick={() => onGenerateImage(recipe.title)}
-        >
-          {isGeneratingImage ? (
-            <Loader2 className="w-6 h-6 animate-spin opacity-20" />
-          ) : (
-            <>
-              <Sparkles className="w-6 h-6 opacity-10 group-hover/img:opacity-40 transition-opacity mb-3" />
-              <span className="text-xs font-medium text-slate-400 group-hover/img:opacity-60 transition-opacity">Generate AI Recipe Image</span>
-            </>
-          )}
+        <div className="text-center relative z-10">
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600/40 mb-1 block">Recipe Reference</span>
+          <h4 className="text-sm font-sans font-semibold tracking-tight text-slate-400">{recipe.title}</h4>
         </div>
-      )}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500/10" />
+      </div>
 
-      <div className="p-6 space-y-6">
+      <div className="p-8 space-y-8">
         <div className="flex justify-between items-start">
-          <div>
-            <span className="text-[10px] font-semibold tracking-wide uppercase text-slate-500 mb-1 block">
-              {recipe.category}
-            </span>
-            <h3 className="text-xl font-sans font-semibold tracking-tight text-slate-900">{recipe.title}</h3>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider rounded-md">
+                {recipe.category}
+              </span>
+              <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400">
+                <Clock className="w-3 h-3" />
+                {recipe.cookingTime}
+              </div>
+            </div>
+            <h3 className="text-2xl font-sans font-bold tracking-tight text-slate-900 leading-tight">{recipe.title}</h3>
           </div>
           <button 
             onClick={() => onToggleFavorite?.(recipe)}
             className={cn(
-              "p-2 rounded-full transition-colors",
-              isFavorite ? "bg-red-50 text-red-500" : "bg-slate-50 text-slate-400 hover:text-red-500"
+              "p-3 rounded-2xl transition-all duration-300",
+              isFavorite ? "bg-red-50 text-red-500 shadow-sm" : "bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50/50"
             )}
           >
-            <Heart className={cn("w-4 h-4", isFavorite && "fill-current")} />
+            <Heart className={cn("w-5 h-5", isFavorite && "fill-current")} />
           </button>
         </div>
 
-        {/* Nutritional Information */}
-        {recipe.nutrition ? (
-          <div className="grid grid-cols-4 gap-2 py-3 border-y border-slate-100">
-            <div className="text-center">
-              <p className="text-[10px] font-semibold tracking-wide uppercase text-slate-500 mb-1">Calories</p>
-              <p className="text-xs font-sans font-semibold tracking-tight text-slate-900">{recipe.nutrition.calories}</p>
-            </div>
-            <div className="text-center border-l border-slate-100">
-              <p className="text-[10px] font-semibold tracking-wide uppercase text-slate-500 mb-1">Protein</p>
-              <p className="text-xs font-sans font-semibold tracking-tight text-slate-900">{recipe.nutrition.protein}</p>
-            </div>
-            <div className="text-center border-l border-slate-100">
-              <p className="text-[10px] font-semibold tracking-wide uppercase text-slate-500 mb-1">Carbs</p>
-              <p className="text-xs font-sans font-semibold tracking-tight text-slate-900">{recipe.nutrition.carbs}</p>
-            </div>
-            <div className="text-center border-l border-slate-100">
-              <p className="text-[10px] font-semibold tracking-wide uppercase text-slate-500 mb-1">Fats</p>
-              <p className="text-xs font-sans font-semibold tracking-tight text-slate-900">{recipe.nutrition.fats}</p>
+        {/* Nutritional Information Table */}
+        {recipe.nutrition && (
+          <div className="overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/30">
+            <div className="grid grid-cols-4 divide-x divide-slate-100">
+              <div className="p-3 text-center">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Calories</p>
+                <p className="text-sm font-sans font-bold text-slate-900">{recipe.nutrition.calories}</p>
+              </div>
+              <div className="p-3 text-center">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Protein</p>
+                <p className="text-sm font-sans font-bold text-slate-900">{recipe.nutrition.protein}</p>
+              </div>
+              <div className="p-3 text-center">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Carbs</p>
+                <p className="text-sm font-sans font-bold text-slate-900">{recipe.nutrition.carbs}</p>
+              </div>
+              <div className="p-3 text-center">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Fats</p>
+                <p className="text-sm font-sans font-bold text-slate-900">{recipe.nutrition.fats}</p>
+              </div>
             </div>
           </div>
-        ) : (
-          imageUrl && onAnalyzeNutrition && (
-            <button 
-              onClick={() => onAnalyzeNutrition(recipe, imageUrl)}
-              disabled={isAnalyzingNutrition}
-              className="w-full py-2 bg-slate-50 border border-slate-200 rounded-3xl text-[10px] font-semibold tracking-wide uppercase text-slate-500 hover:opacity-100 transition-opacity flex items-center justify-center gap-2"
-            >
-              {isAnalyzingNutrition ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <Sparkles className="w-3 h-3" />
-              )}
-              Analyze Nutrition
-            </button>
-          )
         )}
 
-        <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3 h-3" />
-            {recipe.cookingTime}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Utensils className="w-3 h-3" />
-            {recipe.ingredients.length} Ingredients
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <h4 className="flex items-center gap-2 text-xs font-medium tracking-wide mb-3">
-              <BookOpen className="w-3 h-3" /> Ingredients
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <h4 className="flex items-center gap-2 text-sm font-bold tracking-tight text-slate-800">
+              <div className="w-6 h-6 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+              </div>
+              Ingredients
+              <span className="ml-auto text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                {recipe.ingredients.length} Items
+              </span>
             </h4>
-            <ul className="space-y-2">
+            <ul className="space-y-2.5">
               {recipe.ingredients.map((ing, i) => (
-                <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
-                  <span className="w-1 h-1 bg-slate-300 rounded-full mt-1.5 shrink-0" />
-                  {ing}
+                <li key={i} className="text-sm text-slate-600 flex items-start gap-3 group/item">
+                  <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500/30 group-hover/item:bg-emerald-500 transition-colors shrink-0" />
+                  <span className="leading-tight">{ing}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="pt-4 border-t border-slate-100">
-            <h4 className="text-xs font-medium tracking-wide mb-3">Instructions</h4>
-            <ol className="space-y-3">
+          <div className="space-y-4">
+            <h4 className="flex items-center gap-2 text-sm font-bold tracking-tight text-slate-800">
+              <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Activity className="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              Instructions
+            </h4>
+            <ol className="space-y-4">
               {recipe.instructions.map((step, i) => (
-                <li key={i} className="text-xs text-slate-600 flex gap-3">
-                  <span className="font-sans font-semibold tracking-tight opacity-30 shrink-0">{String(i + 1).padStart(2, '0')}</span>
-                  {step}
+                <li key={i} className="text-sm text-slate-600 flex gap-4 group/step">
+                  <span className="text-xs font-sans font-bold text-slate-300 group-hover/step:text-blue-500 transition-colors shrink-0 pt-0.5">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="leading-relaxed">{step}</span>
                 </li>
               ))}
             </ol>

@@ -84,20 +84,27 @@ export async function generateDietPlan(profile: UserProfile, bmi: number, bodyFa
     - If "English" is selected, provide a standard detailed English response.
     
     Provide a detailed guide including:
-    1. Recommended local foods for early morning/start of the day available in ${profile.state}.
-    2. Nutritional breakdown tailored to their body metrics and calculated BMI/Body Fat.
-    3. Why these specific regional foods are suitable for this profile.
-    4. Tips for sourcing these ingredients locally in ${profile.country}.
-    5. A detailed recipe for one of the recommended foods including ingredients, instructions, and cooking time.
+    1. **Bulleted Report**: A comprehensive summary of the diet strategy using nested bullet points for better hierarchy and readability.
+    2. **Nutritional Breakdown (Table Format)**: A clear table showing the nutritional breakdown (Calories, Protein, Carbs, Fats) tailored to their body metrics.
+    3. **Meal Schedule (Stacked Column/Table Format)**: A structured table or stacked column layout for the meal plan (Breakfast, Lunch, Snack, Dinner) with specific timings and local food recommendations.
+    4. **Regional Suitability**: Why these specific regional foods are suitable for this profile, using nested bullets.
+    5. **Local Sourcing Guide**: Tips for sourcing these ingredients locally in ${profile.country}, presented in a table or structured list.
+    6. **Detailed Recipe**: A detailed recipe for one of the recommended foods including ingredients (bulleted), instructions (numbered), and cooking time.
     
-    ALSO, provide a list of EXACTLY 40 diverse local food items recommended for this profile. For each item, provide a short, descriptive English keyword that can be used to fetch a relevant food image from a stock photo service (e.g., "ripe mango", "steamed idli", "whole wheat paratha").
+    FORMATTING RULES:
+    - Use **Nested Bullet Points** for detailed explanations.
+    - Use **Table Format** for data-heavy sections like nutritional values and meal schedules.
+    - Ensure high readability with clear headers and icons (using emojis if appropriate for markdown).
+    - Use a **Stacked Column** approach for comparing different options or showing progress if applicable.
+    
+    ALSO, provide a list of EXACTLY 10 diverse local food items recommended for this profile (no need for image keywords, just the names).
     
     Return the response ONLY as a JSON object with the following structure:
     {
       "planMarkdown": "The full detailed markdown diet plan here...",
       "recommendedFoods": [
-        { "name": "Food Name in ${profile.language}", "imageKeyword": "English keyword for image" },
-        ... (exactly 40 items)
+        { "name": "Food Name in ${profile.language}" },
+        ... (exactly 10 items)
       ]
     }`;
 
