@@ -210,12 +210,79 @@ export default function App() {
         onclone: (clonedDoc) => {
           const style = clonedDoc.createElement('style');
           style.innerHTML = `
-            #diet-report, [id^="recipe-"], #diet-report *, [id^="recipe-"] * {
-              color: emerald-600 !important;
-              border-color: #E6E6E6 !important;
+            :root {
+              --color-slate-50: #f8fafc !important;
+              --color-slate-100: #f1f5f9 !important;
+              --color-slate-200: #e2e8f0 !important;
+              --color-slate-300: #cbd5e1 !important;
+              --color-slate-400: #94a3b8 !important;
+              --color-slate-500: #64748b !important;
+              --color-slate-600: #475569 !important;
+              --color-slate-700: #334155 !important;
+              --color-slate-800: #1e293b !important;
+              --color-slate-900: #0f172a !important;
+              --color-emerald-50: #ecfdf5 !important;
+              --color-emerald-100: #d1fae5 !important;
+              --color-emerald-200: #a7f3d0 !important;
+              --color-emerald-500: #10b981 !important;
+              --color-emerald-600: #059669 !important;
+              --color-emerald-700: #047857 !important;
+              --color-red-50: #fef2f2 !important;
+              --color-red-100: #fee2e2 !important;
+              --color-red-500: #ef4444 !important;
+              --color-red-600: #dc2626 !important;
+              --color-red-800: #991b1b !important;
+              --color-orange-500: #f97316 !important;
+              --color-green-50: #f0fdf4 !important;
+              --color-green-400: #4ade80 !important;
+              --color-green-500: #22c55e !important;
+              --color-green-600: #16a34a !important;
+              --color-emerald-50: #ecfdf5 !important;
+              --color-emerald-100: #d1fae5 !important;
+              --color-emerald-200: #a7f3d0 !important;
+              --color-emerald-500: #10b981 !important;
+              --color-emerald-600: #059669 !important;
+              --color-emerald-700: #047857 !important;
+              --color-blue-400: #60a5fa !important;
+              --color-purple-400: #c084fc !important;
+              --color-pink-400: #f472b6 !important;
+              --color-slate-50: #f8fafc !important;
+              --color-slate-100: #f1f5f9 !important;
+              --color-slate-200: #e2e8f0 !important;
+              --color-slate-300: #cbd5e1 !important;
+              --color-slate-400: #94a3b8 !important;
+              --color-slate-500: #64748b !important;
+              --color-slate-600: #475569 !important;
+              --color-slate-700: #334155 !important;
+              --color-slate-800: #1e293b !important;
+              --color-slate-900: #0f172a !important;
+              --color-gray-100: #f3f4f6 !important;
+              --color-gray-600: #4b5563 !important;
+              --color-black: #000000 !important;
+              --color-white: #ffffff !important;
+              --color-transparent: transparent !important;
             }
+            .bg-red-50\/30 { background-color: rgba(254, 242, 242, 0.3) !important; }
+            .bg-red-50\/50 { background-color: rgba(254, 242, 242, 0.5) !important; }
+            .text-red-800\/70 { color: rgba(153, 27, 27, 0.7) !important; }
+            .text-slate-900\/40 { color: rgba(15, 23, 42, 0.4) !important; }
+            .text-white\/60 { color: rgba(255, 255, 255, 0.6) !important; }
+            .bg-black\/20 { background-color: rgba(0, 0, 0, 0.2) !important; }
+            .bg-black\/40 { background-color: rgba(0, 0, 0, 0.4) !important; }
+            .bg-white\/80 { background-color: rgba(255, 255, 255, 0.8) !important; }
+            .border-green-500\/30 { border-color: rgba(34, 197, 94, 0.3) !important; }
+            .border-red-500\/30 { border-color: rgba(239, 68, 68, 0.3) !important; }
+            .bg-gradient-to-t { --tw-gradient-position: to top !important; }
+            .focus\:ring-emerald-500\/20:focus { --tw-ring-color: rgba(16, 185, 129, 0.2) !important; }
+            .from-black\/80 { --tw-gradient-from: rgba(0, 0, 0, 0.8) !important; }
+            .via-black\/20 { --tw-gradient-via: rgba(0, 0, 0, 0.2) !important; }
+            
             #diet-report, [id^="recipe-"] {
               background-color: #ffffff !important;
+              color: #0f172a !important;
+            }
+            #diet-report *, [id^="recipe-"] * {
+              box-shadow: none !important;
             }
           `;
           clonedDoc.head.appendChild(style);
@@ -270,12 +337,79 @@ export default function App() {
         onclone: (clonedDoc) => {
           const style = clonedDoc.createElement('style');
           style.innerHTML = `
-            #diet-report, [id^="recipe-"], #diet-report *, [id^="recipe-"] * {
-              color: emerald-600 !important;
-              border-color: #E6E6E6 !important;
+            :root {
+              --color-slate-50: #f8fafc !important;
+              --color-slate-100: #f1f5f9 !important;
+              --color-slate-200: #e2e8f0 !important;
+              --color-slate-300: #cbd5e1 !important;
+              --color-slate-400: #94a3b8 !important;
+              --color-slate-500: #64748b !important;
+              --color-slate-600: #475569 !important;
+              --color-slate-700: #334155 !important;
+              --color-slate-800: #1e293b !important;
+              --color-slate-900: #0f172a !important;
+              --color-emerald-50: #ecfdf5 !important;
+              --color-emerald-100: #d1fae5 !important;
+              --color-emerald-200: #a7f3d0 !important;
+              --color-emerald-500: #10b981 !important;
+              --color-emerald-600: #059669 !important;
+              --color-emerald-700: #047857 !important;
+              --color-red-50: #fef2f2 !important;
+              --color-red-100: #fee2e2 !important;
+              --color-red-500: #ef4444 !important;
+              --color-red-600: #dc2626 !important;
+              --color-red-800: #991b1b !important;
+              --color-orange-500: #f97316 !important;
+              --color-green-50: #f0fdf4 !important;
+              --color-green-400: #4ade80 !important;
+              --color-green-500: #22c55e !important;
+              --color-green-600: #16a34a !important;
+              --color-emerald-50: #ecfdf5 !important;
+              --color-emerald-100: #d1fae5 !important;
+              --color-emerald-200: #a7f3d0 !important;
+              --color-emerald-500: #10b981 !important;
+              --color-emerald-600: #059669 !important;
+              --color-emerald-700: #047857 !important;
+              --color-blue-400: #60a5fa !important;
+              --color-purple-400: #c084fc !important;
+              --color-pink-400: #f472b6 !important;
+              --color-slate-50: #f8fafc !important;
+              --color-slate-100: #f1f5f9 !important;
+              --color-slate-200: #e2e8f0 !important;
+              --color-slate-300: #cbd5e1 !important;
+              --color-slate-400: #94a3b8 !important;
+              --color-slate-500: #64748b !important;
+              --color-slate-600: #475569 !important;
+              --color-slate-700: #334155 !important;
+              --color-slate-800: #1e293b !important;
+              --color-slate-900: #0f172a !important;
+              --color-gray-100: #f3f4f6 !important;
+              --color-gray-600: #4b5563 !important;
+              --color-black: #000000 !important;
+              --color-white: #ffffff !important;
+              --color-transparent: transparent !important;
             }
+            .bg-red-50\/30 { background-color: rgba(254, 242, 242, 0.3) !important; }
+            .bg-red-50\/50 { background-color: rgba(254, 242, 242, 0.5) !important; }
+            .text-red-800\/70 { color: rgba(153, 27, 27, 0.7) !important; }
+            .text-slate-900\/40 { color: rgba(15, 23, 42, 0.4) !important; }
+            .text-white\/60 { color: rgba(255, 255, 255, 0.6) !important; }
+            .bg-black\/20 { background-color: rgba(0, 0, 0, 0.2) !important; }
+            .bg-black\/40 { background-color: rgba(0, 0, 0, 0.4) !important; }
+            .bg-white\/80 { background-color: rgba(255, 255, 255, 0.8) !important; }
+            .border-green-500\/30 { border-color: rgba(34, 197, 94, 0.3) !important; }
+            .border-red-500\/30 { border-color: rgba(239, 68, 68, 0.3) !important; }
+            .bg-gradient-to-t { --tw-gradient-position: to top !important; }
+            .focus\:ring-emerald-500\/20:focus { --tw-ring-color: rgba(16, 185, 129, 0.2) !important; }
+            .from-black\/80 { --tw-gradient-from: rgba(0, 0, 0, 0.8) !important; }
+            .via-black\/20 { --tw-gradient-via: rgba(0, 0, 0, 0.2) !important; }
+            
             #diet-report, [id^="recipe-"] {
               background-color: #ffffff !important;
+              color: #0f172a !important;
+            }
+            #diet-report *, [id^="recipe-"] * {
+              box-shadow: none !important;
             }
           `;
           clonedDoc.head.appendChild(style);
@@ -305,8 +439,24 @@ export default function App() {
   const handleShareToWhatsAppWeb = async () => {
     if (!dietPlan) return;
     
-    // Generate and download the PDF first
     const file = await generateDietPDFBlob();
+    const text = `Check out my personalized diet plan from Diet Advisor! Please see the attached file and the location.\n\nLocation: ${profile.state}, ${profile.country}`;
+
+    // On mobile, navigator.share is much better as it actually attaches the file
+    if (file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'My Personalized Diet Plan',
+          text: text
+        });
+        return;
+      } catch (error) {
+        console.error("Share Error:", error);
+      }
+    }
+
+    // Fallback for desktop or when navigator.share fails
     if (file) {
       const url = URL.createObjectURL(file);
       const a = document.createElement('a');
@@ -316,7 +466,6 @@ export default function App() {
       URL.revokeObjectURL(url);
     }
 
-    const text = `Check out my personalized diet plan from Diet Advisor! (Please see the attached PDF)\n\nLocation: ${profile.state}, ${profile.country}`;
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -327,12 +476,14 @@ export default function App() {
     const file = await generateDietPDFBlob();
     if (!file) return;
 
+    const text = `Check out my personalized diet plan from Diet Advisor! Please see the attached file and the location.\n\nLocation: ${profile.state}, ${profile.country}`;
+
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({
           files: [file],
           title: 'My Personalized Diet Plan',
-          text: 'Check out my personalized diet plan from Diet Advisor!'
+          text: text
         });
       } catch (error) {
         console.error("Share Error:", error);
