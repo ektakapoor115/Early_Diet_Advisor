@@ -15,9 +15,18 @@ export interface UserProfile {
   height: string;
   width: string;
   language: "English" | "Hindi" | "English Version";
-  planType: "Daily" | "Weekly" | "Monthly" | "Morning" | "Evening" | "Night";
+  planDuration: "Daily" | "Weekly" | "Monthly";
+  mealScope: "All Meals" | "Morning Only" | "Lunch Only" | "Evening Only" | "Dinner Only";
   illnesses: string[];
   month: string;
+  dietaryPreference: string;
+  activityLevel: string;
+  allergy: string[];
+  goal: string;
+  tastePreference: string;
+  maritalStatus: string;
+  derivativePreference: string;
+  energyAddon: string;
 }
 
 export interface DietPlanResponse {
@@ -35,22 +44,38 @@ export async function generateDietPlan(profile: UserProfile, bmi: number, bodyFa
     - Body Metrics: Weight ${profile.weight}, Height ${profile.height}, Width ${profile.width}
     - Calculated BMI: ${bmi.toFixed(1)}
     - Estimated Body Fat Percentage: ${bodyFat.toFixed(1)}%
-    - Plan Type/Time: ${profile.planType} (This is the specific scope of the plan)
+    - Plan Duration: ${profile.planDuration}
+    - Meal Scope: ${profile.mealScope}
+    - Dietary Preference: ${profile.dietaryPreference}
+    - Activity Level: ${profile.activityLevel}
+    - Allergies: ${(profile.allergy || []).length > 0 ? profile.allergy.join(", ") : "None"}
+    - Goal: ${profile.goal}
+    - Energy Add-on: ${profile.energyAddon}
+    - Taste Preference: ${profile.tastePreference}
+    - Marital Status: ${profile.maritalStatus}
+    - Lifestyle/Derivative Preference: ${profile.derivativePreference}
     - Health Conditions/Illnesses: ${(profile.illnesses || []).length > 0 ? profile.illnesses.join(", ") : "None"}
     
     CRITICAL: The diet plan MUST be strictly tailored to the specific food availability, cultural dietary habits, and local "zones" of ${profile.state}, ${profile.country} during the month of ${profile.month}.
     
-    IMPORTANT: The plan must strictly account for the selected health conditions (${(profile.illnesses || []).join(", ")}). Provide specific dietary restrictions and recommendations for these conditions.
+    IMPORTANT: The plan must strictly account for the selected health conditions (${(profile.illnesses || []).join(", ")}). 
+    - Provide a dedicated section titled "### ⚠️ Medical Warnings & Condition-Specific Advice".
+    - For each selected condition, provide:
+        a) **Why this matters**: A brief educational explanation of how diet impacts this specific condition.
+        b) **Strictly Avoid**: A list of local foods/ingredients to avoid with specific reasons.
+        c) **Recommended Focus**: Specific nutrients or food groups to prioritize (e.g., "High fiber for PCOS", "Low purine for Uric Acid").
+        d) **Nutrient-Drug Interactions**: Mention common medications for these conditions and potential food interactions (e.g., "Avoid grapefruit if on certain BP meds").
+    - Include a clear medical disclaimer: "This plan is AI-generated for educational purposes and does not replace professional medical advice. Consult a healthcare provider before starting."
     
     SEASONAL REQUIREMENT: You MUST prioritize seasonal fruits, vegetables, and grains that are naturally available in ${profile.state} during ${profile.month}.
     
-    SCOPE: The plan should focus on the selected time/type: ${profile.planType}. 
-    - If "Daily" is selected, provide a full day plan with exactly these four courses:
+    SCOPE: The plan should focus on the selected duration (${profile.planDuration}) and meal scope (${profile.mealScope}).
+    - If "Daily" is selected with "All Meals", provide a full day plan with exactly these four courses:
       1. Morning Breakfast
       2. Lunch
       3. Evening Snack
       4. Night Dinner
-    - If "Morning", "Evening", or "Night" is selected, provide a detailed meal plan for that specific time.
+    - If a specific meal time like "Morning Only", "Lunch Only", "Evening Only", or "Dinner Only" is selected, provide a detailed meal plan for that specific time only.
     - If "Weekly" or "Monthly" is selected, provide a comprehensive plan for that duration.
     
     LANGUAGE REQUIREMENT: Please provide the entire response in ${profile.language}. 
@@ -102,8 +127,23 @@ export async function generateRecipe(profile: UserProfile): Promise<any> {
     - Age: ${profile.age}
     - Location: ${profile.state}, ${profile.country}
     - Month: ${profile.month}
+    - Dietary Preference: ${profile.dietaryPreference}
+    - Activity Level: ${profile.activityLevel}
+    - Allergies: ${(profile.allergy || []).length > 0 ? profile.allergy.join(", ") : "None"}
+    - Goal: ${profile.goal}
+    - Energy Add-on: ${profile.energyAddon}
+    - Taste Preference: ${profile.tastePreference}
+    - Marital Status: ${profile.maritalStatus}
+    - Lifestyle/Derivative Preference: ${profile.derivativePreference}
     - Health Conditions: ${(profile.illnesses || []).join(", ")}
-    - Meal Time/Type: ${profile.planType}
+    - Plan Duration: ${profile.planDuration}
+    - Meal Scope: ${profile.mealScope}
+    
+    HEALTH CONDITION FOCUS: The recipe must be safe and beneficial for the selected health conditions: ${(profile.illnesses || []).join(", ")}.
+    - Explicitly state why this recipe is suitable for these conditions (e.g., "Low glycemic index for Diabetes").
+    - List any specific ingredient substitutions for common allergens or condition-related restrictions.
+    - Include a "Health Tip" related to these conditions for this specific meal.
+    - Include a brief "Health Warning" if any ingredient might interact with common medications for these conditions.
     
     SEASONAL REQUIREMENT: Use ingredients that are seasonally available in ${profile.state} during ${profile.month}.
     

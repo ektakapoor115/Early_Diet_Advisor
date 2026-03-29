@@ -23,7 +23,23 @@ import {
   Clock,
   Check,
   Trash2,
-  Key
+  Key,
+  Droplets,
+  Plus,
+  Minus,
+  Candy,
+  Flame,
+  Waves,
+  Layers,
+  ChevronDown,
+  Save,
+  AlertTriangle,
+  CheckCircle,
+  Target,
+  Calendar,
+  Scale,
+  Ruler,
+  History
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "./lib/utils";
@@ -72,9 +88,18 @@ export default function App() {
     height: "155",
     width: "28",
     language: "Hindi",
-    planType: "Daily",
+    planDuration: "Daily",
+    mealScope: "All Meals",
     illnesses: [],
     month: new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date()),
+    dietaryPreference: "Non-Vegan",
+    activityLevel: "Sedentary",
+    allergy: [],
+    goal: "Weight Loss",
+    tastePreference: "Combo",
+    maritalStatus: "Single",
+    derivativePreference: "Standard",
+    energyAddon: "None",
   });
   const [savedProfiles, setSavedProfiles] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem("diet_advisor_profiles");
@@ -94,12 +119,28 @@ export default function App() {
     const saved = localStorage.getItem("diet_advisor_favorite_plans");
     return saved ? JSON.parse(saved) : [];
   });
+  const [planHistory, setPlanHistory] = useState<{ id: string; plan: DietPlanResponse; profile: UserProfile; date: string }[]>(() => {
+    const saved = localStorage.getItem("diet_advisor_plan_history");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"plan" | "analyze" | "favorites">("plan");
+  const [activeTab, setActiveTab] = useState<"home" | "plan" | "analyze" | "favorites" | "tracker" | "history">("home");
+  const [isTasteDropdownOpen, setIsTasteDropdownOpen] = useState(false);
   const [aiImages, setAiImages] = useState<Record<string, string>>({});
+  const [waterIntake, setWaterIntake] = useState<number>(() => {
+    const saved = localStorage.getItem("diet_advisor_water_intake");
+    return saved ? parseInt(saved) : 0;
+  });
+  const [waterGoal, setWaterGoal] = useState<number>(() => {
+    const saved = localStorage.getItem("diet_advisor_water_goal");
+    return saved ? parseInt(saved) : 8;
+  });
   const [isGeneratingAiImage, setIsGeneratingAiImage] = useState<Record<string, boolean>>({});
+  const [isAnalyzingNutrition, setIsAnalyzingNutrition] = useState<Record<string, boolean>>({});
   const [hasApiKey, setHasApiKey] = useState(false);
   const [quotaModalOpen, setQuotaModalOpen] = useState(false);
+  const [saveConfirmationOpen, setSaveConfirmationOpen] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const lastQuotaErrorTime = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +154,14 @@ export default function App() {
     };
     checkKey();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("diet_advisor_water_intake", waterIntake.toString());
+  }, [waterIntake]);
+
+  useEffect(() => {
+    localStorage.setItem("diet_advisor_water_goal", waterGoal.toString());
+  }, [waterGoal]);
 
   const handleOpenKeyDialog = async () => {
     if (window.aistudio?.openSelectKey) {
@@ -162,7 +211,7 @@ export default function App() {
           const style = clonedDoc.createElement('style');
           style.innerHTML = `
             #diet-report, [id^="recipe-"], #diet-report *, [id^="recipe-"] * {
-              color: #1A1A1A !important;
+              color: emerald-600 !important;
               border-color: #E6E6E6 !important;
             }
             #diet-report, [id^="recipe-"] {
@@ -222,7 +271,7 @@ export default function App() {
           const style = clonedDoc.createElement('style');
           style.innerHTML = `
             #diet-report, [id^="recipe-"], #diet-report *, [id^="recipe-"] * {
-              color: #1A1A1A !important;
+              color: emerald-600 !important;
               border-color: #E6E6E6 !important;
             }
             #diet-report, [id^="recipe-"] {
@@ -267,7 +316,7 @@ export default function App() {
       URL.revokeObjectURL(url);
     }
 
-    const text = `Check out my personalized diet plan from Early Diet Advisor! (Please see the attached PDF)\n\nLocation: ${profile.state}, ${profile.country}`;
+    const text = `Check out my personalized diet plan from Diet Advisor! (Please see the attached PDF)\n\nLocation: ${profile.state}, ${profile.country}`;
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -283,7 +332,7 @@ export default function App() {
         await navigator.share({
           files: [file],
           title: 'My Personalized Diet Plan',
-          text: 'Check out my personalized diet plan from Early Diet Advisor!'
+          text: 'Check out my personalized diet plan from Diet Advisor!'
         });
       } catch (error) {
         console.error("Share Error:", error);
@@ -322,6 +371,45 @@ export default function App() {
     }
   };
 
+  const handleAnalyzeNutrition = async (recipe: Recipe, imageUrl: string) => {
+    if (isAnalyzingNutrition[recipe.id]) return;
+    
+    setIsAnalyzingNutrition(prev => ({ ...prev, [recipe.id]: true }));
+    try {
+      const nutritionMarkdown = await analyzeFoodImage(imageUrl);
+      
+      // Flexible regex to extract values from markdown
+      const caloriesMatch = nutritionMarkdown.match(/Calories.*?(\d+)/i);
+      const proteinMatch = nutritionMarkdown.match(/Protein.*?(\d+(?:\.\d+)?\s*g)/i);
+      const carbsMatch = nutritionMarkdown.match(/Carbohydrates.*?(\d+(?:\.\d+)?\s*g)/i);
+      const fatsMatch = nutritionMarkdown.match(/Fats.*?(\d+(?:\.\d+)?\s*g)/i);
+      
+      const nutrition = {
+        calories: caloriesMatch ? `${caloriesMatch[1]} kcal` : "N/A",
+        protein: proteinMatch ? proteinMatch[1] : "N/A",
+        carbs: carbsMatch ? carbsMatch[1] : "N/A",
+        fats: fatsMatch ? fatsMatch[1] : "N/A"
+      };
+      
+      const updatedRecipe = { ...recipe, nutrition };
+      
+      if (currentRecipe?.id === recipe.id) {
+        setCurrentRecipe(updatedRecipe);
+      }
+      
+      setFavorites(prev => {
+        const newFavs = prev.map(r => r.id === recipe.id ? updatedRecipe : r);
+        localStorage.setItem("diet_advisor_favorites", JSON.stringify(newFavs));
+        return newFavs;
+      });
+      
+    } catch (error) {
+      console.error("Error analyzing nutrition:", error);
+    } finally {
+      setIsAnalyzingNutrition(prev => ({ ...prev, [recipe.id]: false }));
+    }
+  };
+
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === "country") {
@@ -333,15 +421,41 @@ export default function App() {
 
   const handleSaveProfile = () => {
     if (!profile.name.trim()) return;
-    const newProfiles = [...savedProfiles, { ...profile }];
+    
+    const existingProfileIndex = savedProfiles.findIndex(p => p.name.toLowerCase() === profile.name.toLowerCase());
+    
+    if (existingProfileIndex !== -1) {
+      setSaveConfirmationOpen(true);
+    } else {
+      performSaveProfile();
+    }
+  };
+
+  const performSaveProfile = () => {
+    const existingProfileIndex = savedProfiles.findIndex(p => p.name.toLowerCase() === profile.name.toLowerCase());
+    let newProfiles;
+    
+    if (existingProfileIndex !== -1) {
+      newProfiles = [...savedProfiles];
+      newProfiles[existingProfileIndex] = { ...profile };
+    } else {
+      newProfiles = [...savedProfiles, { ...profile }];
+    }
+    
     setSavedProfiles(newProfiles);
     localStorage.setItem("diet_advisor_profiles", JSON.stringify(newProfiles));
+    setSaveConfirmationOpen(false);
+    setSaveSuccessMessage(`Profile "${profile.name}" saved successfully.`);
+    
+    setTimeout(() => {
+      setSaveSuccessMessage(null);
+    }, 3000);
   };
 
   const toggleFavoritePlan = () => {
     if (!dietPlan) return;
     
-    const planId = `${profile.name}_${profile.month}_${profile.planType}`;
+    const planId = `${profile.name}_${profile.month}_${profile.planDuration}_${profile.mealScope}`;
     const isFavorite = favoritePlans.some(p => p.id === planId);
     
     let newFavoritePlans;
@@ -364,7 +478,9 @@ export default function App() {
     setProfile({
       ...p,
       illnesses: p.illnesses || [],
-      planType: p.planType || "Daily",
+      allergy: p.allergy || [],
+      planDuration: p.planDuration || "Daily",
+      mealScope: p.mealScope || "All Meals",
       month: p.month || new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date())
     });
   };
@@ -376,14 +492,26 @@ export default function App() {
   };
 
   const handleGeneratePlan = async () => {
-    if (!profile.gender || !profile.age || !profile.country || !profile.state || !profile.weight || !profile.height || !profile.width) {
-      setValidationMessage("Please fill in all profile details.");
+    if (!profile.gender || !profile.age || !profile.country || !profile.state || !profile.weight || !profile.height || !profile.width || !profile.goal) {
+      setValidationMessage("Please fill in all profile details including your goal.");
       return;
     }
     setIsGeneratingPlan(true);
     try {
       const plan = await generateDietPlan(profile, bmi, bodyFat);
       setDietPlan(plan);
+      
+      // Save to history
+      const historyItem = {
+        id: Math.random().toString(36).substr(2, 9),
+        plan: plan,
+        profile: { ...profile },
+        date: new Date().toLocaleString()
+      };
+      const newHistory = [historyItem, ...planHistory].slice(0, 20); // Keep last 20
+      setPlanHistory(newHistory);
+      localStorage.setItem("diet_advisor_plan_history", JSON.stringify(newHistory));
+
       setActiveTab("plan");
       
       // Auto-generate first 3 AI images to show quality
@@ -467,22 +595,22 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FDFCFB] text-[#1A1A1A] font-sans selection:bg-[#E6E6E6]">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-emerald-200">
       {/* Header */}
-      <header className="border-b border-[#E6E6E6] py-4 md:py-6 px-4 md:px-8 sticky top-0 bg-[#FDFCFB]/80 backdrop-blur-md z-10">
+      <header className="border-b border-slate-200 py-4 px-4 md:px-8 sticky top-0 bg-white/80 backdrop-blur-xl z-20 shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 md:gap-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-[#1A1A1A] rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-emerald-600 rounded-full flex items-center justify-center">
               <Sparkles className="text-white w-4 h-4 md:w-5 md:h-5" />
             </div>
-            <h1 className="text-xl md:text-2xl font-serif italic tracking-tight">Early Diet Advisor</h1>
+            <h1 className="text-xl md:text-2xl font-sans font-semibold tracking-tight text-slate-900">Diet Advisor</h1>
           </div>
           <div className="flex items-center gap-4 md:gap-6 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 hide-scrollbar">
             <nav className="flex gap-2 md:gap-4 text-[10px] md:text-xs uppercase tracking-widest font-medium items-center whitespace-nowrap mx-auto md:mx-0">
               <button 
                 onClick={handleOpenKeyDialog}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-1 rounded-full border transition-all text-[8px] uppercase tracking-widest font-bold",
+                  "flex items-center gap-2 px-3 py-1 rounded-full border transition-all text-[10px] font-semibold tracking-wide uppercase",
                   hasApiKey ? "border-green-500/30 text-green-600 bg-green-50" : "border-red-500/30 text-red-600 bg-red-50 hover:bg-red-100"
                 )}
               >
@@ -490,10 +618,19 @@ export default function App() {
                 {hasApiKey ? "API Key Active" : "Quota Limit? Use Your Key"}
               </button>
               <button 
+                onClick={() => setActiveTab("home")} 
+                className={cn(
+                  "px-4 py-2 rounded-full transition-all", 
+                  activeTab === "home" ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                Home
+              </button>
+              <button 
                 onClick={() => setActiveTab("plan")} 
                 className={cn(
                   "px-4 py-2 rounded-full transition-all", 
-                  activeTab === "plan" ? "bg-[#1A1A1A] text-white opacity-100" : "hover:bg-[#F0F0F0] opacity-70"
+                  activeTab === "plan" ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 )}
               >
                 Diet Plan
@@ -502,7 +639,7 @@ export default function App() {
                 onClick={() => setActiveTab("analyze")} 
                 className={cn(
                   "px-4 py-2 rounded-full transition-all", 
-                  activeTab === "analyze" ? "bg-[#1A1A1A] text-white opacity-100" : "hover:bg-[#F0F0F0] opacity-70"
+                  activeTab === "analyze" ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 )}
               >
                 Food Analysis
@@ -511,37 +648,55 @@ export default function App() {
                 onClick={() => setActiveTab("favorites")} 
                 className={cn(
                   "px-4 py-2 rounded-full transition-all flex items-center gap-2", 
-                  activeTab === "favorites" ? "bg-[#1A1A1A] text-white opacity-100" : "hover:bg-[#F0F0F0] opacity-70"
+                  activeTab === "favorites" ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 )}
               >
                 Favorites {(favorites.length + favoritePlans.length) > 0 && (
                   <span className={cn(
                     "w-4 h-4 text-[8px] rounded-full flex items-center justify-center",
-                    activeTab === "favorites" ? "bg-white text-[#1A1A1A]" : "bg-[#1A1A1A] text-white"
+                    activeTab === "favorites" ? "bg-white text-slate-900" : "bg-emerald-600 text-white"
                   )}>
                     {favorites.length + favoritePlans.length}
                   </span>
                 )}
+              </button>
+              <button 
+                onClick={() => setActiveTab("tracker")} 
+                className={cn(
+                  "px-4 py-2 rounded-full transition-all flex items-center gap-2", 
+                  activeTab === "tracker" ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                Tracker
+              </button>
+              <button 
+                onClick={() => setActiveTab("history")} 
+                className={cn(
+                  "px-4 py-2 rounded-full transition-all flex items-center gap-2", 
+                  activeTab === "history" ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                History
               </button>
             </nav>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-0 min-h-[calc(100vh-89px)]">
+      <main className="max-w-7xl mx-auto grid grid-cols-1 gap-0 min-h-[calc(100vh-89px)]">
         {/* Left Panel: Inputs */}
-        <div className="lg:col-span-5 border-r border-[#E6E6E6] p-8 lg:p-12 overflow-y-auto">
+        <div className={cn("border border-slate-200 p-6 lg:p-10 overflow-y-auto bg-white shadow-sm rounded-3xl m-4 lg:m-6", activeTab === "home" ? "block" : "hidden")}>
           <div className="space-y-12">
             {/* Profile Section */}
             <section>
               <div className="flex items-center gap-2 mb-8">
-                <span className="text-[10px] uppercase tracking-[0.2em] font-bold opacity-40">01</span>
-                <h2 className="text-xl font-serif italic">Your Profile</h2>
+                <span className="text-[10px] uppercase tracking-wider font-bold opacity-40">01</span>
+                <h2 className="text-xl font-sans font-semibold tracking-tight text-slate-900">Your Profile</h2>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2 group md:col-span-2">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
                     <User className="w-3 h-3" /> Full Name
                   </label>
                   <input 
@@ -550,19 +705,19 @@ export default function App() {
                     placeholder="Enter your name"
                     value={profile.name}
                     onChange={handleProfileChange}
-                    className="w-full bg-transparent border-b border-[#E6E6E6] py-2 focus:border-[#1A1A1A] outline-none transition-all placeholder:opacity-30 focus:pl-1"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm placeholder:text-slate-400"
                   />
                 </div>
 
                 <div className="space-y-2 group">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
                     <User className="w-3 h-3" /> Gender
                   </label>
                   <select 
                     name="gender" 
                     value={profile.gender}
                     onChange={handleProfileChange}
-                    className="w-full bg-transparent border-b border-[#E6E6E6] py-2 focus:border-[#1A1A1A] outline-none transition-all appearance-none focus:pl-1"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
                   >
                     <option value="">Select</option>
                     <option value="male">Male</option>
@@ -572,8 +727,8 @@ export default function App() {
                 </div>
 
                 <div className="space-y-2 group">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
-                    <Activity className="w-3 h-3" /> Exact Age
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Clock className="w-3 h-3" /> Exact Age
                   </label>
                   <input 
                     type="number" 
@@ -581,19 +736,19 @@ export default function App() {
                     placeholder="e.g. 25"
                     value={profile.age}
                     onChange={handleProfileChange}
-                    className="w-full bg-transparent border-b border-[#E6E6E6] py-2 focus:border-[#1A1A1A] outline-none transition-all placeholder:opacity-30 focus:pl-1"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm placeholder:text-slate-400"
                   />
                 </div>
 
                 <div className="space-y-2 group">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
                     <MapPin className="w-3 h-3" /> Country
                   </label>
                   <select 
                     name="country" 
                     value={profile.country}
                     onChange={handleProfileChange}
-                    className="w-full bg-transparent border-b border-[#E6E6E6] py-2 focus:border-[#1A1A1A] outline-none transition-all appearance-none focus:pl-1"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
                   >
                     <option value="">Select Country</option>
                     {Object.keys(COUNTRIES_STATES).map(c => <option key={c} value={c}>{c}</option>)}
@@ -601,15 +756,15 @@ export default function App() {
                 </div>
 
                 <div className="space-y-2 group">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
-                    <MapPin className="w-3 h-3" /> State/Province
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Globe className="w-3 h-3" /> State/Province
                   </label>
                   <select 
                     name="state" 
                     value={profile.state}
                     onChange={handleProfileChange}
                     disabled={!profile.country}
-                    className="w-full bg-transparent border-b border-[#E6E6E6] py-2 focus:border-[#1A1A1A] outline-none transition-all appearance-none focus:pl-1 disabled:opacity-30"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none disabled:opacity-30"
                   >
                     <option value="">Select State</option>
                     {profile.country && COUNTRIES_STATES[profile.country].map(s => <option key={s} value={s}>{s}</option>)}
@@ -617,7 +772,7 @@ export default function App() {
                 </div>
 
                 <div className="space-y-2 group">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
                     <Activity className="w-3 h-3" /> Weight (kg)
                   </label>
                   <input 
@@ -626,13 +781,13 @@ export default function App() {
                     placeholder="e.g. 70"
                     value={profile.weight}
                     onChange={handleProfileChange}
-                    className="w-full bg-transparent border-b border-[#E6E6E6] py-2 focus:border-[#1A1A1A] outline-none transition-all placeholder:opacity-30 focus:pl-1"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm placeholder:text-slate-400"
                   />
                 </div>
 
                 <div className="space-y-2 group">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
-                    <Activity className="w-3 h-3" /> Height (cm)
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Ruler className="w-3 h-3" /> Height (cm)
                   </label>
                   <input 
                     type="text" 
@@ -640,13 +795,13 @@ export default function App() {
                     placeholder="e.g. 175"
                     value={profile.height}
                     onChange={handleProfileChange}
-                    className="w-full bg-transparent border-b border-[#E6E6E6] py-2 focus:border-[#1A1A1A] outline-none transition-all placeholder:opacity-30 focus:pl-1"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm placeholder:text-slate-400"
                   />
                 </div>
 
                 <div className="space-y-2 group">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
-                    <Activity className="w-3 h-3" /> Body Width
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Ruler className="w-3 h-3" /> Body Width
                   </label>
                   <input 
                     type="text" 
@@ -654,19 +809,19 @@ export default function App() {
                     placeholder="e.g. 45cm"
                     value={profile.width}
                     onChange={handleProfileChange}
-                    className="w-full bg-transparent border-b border-[#E6E6E6] py-2 focus:border-[#1A1A1A] outline-none transition-all placeholder:opacity-30 focus:pl-1"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm placeholder:text-slate-400"
                   />
                 </div>
 
                 <div className="space-y-2 group">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
-                    <Sparkles className="w-3 h-3" /> Plan Language
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Globe className="w-3 h-3" /> Plan Language
                   </label>
                   <select 
                     name="language" 
                     value={profile.language}
                     onChange={handleProfileChange}
-                    className="w-full bg-transparent border-b border-[#E6E6E6] py-2 focus:border-[#1A1A1A] outline-none transition-all appearance-none focus:pl-1"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
                   >
                     <option value="English">English</option>
                     <option value="Hindi">Hindi</option>
@@ -675,33 +830,48 @@ export default function App() {
                 </div>
 
                 <div className="space-y-2 group">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
-                    <Clock className="w-3 h-3" /> Plan Type / Time
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Clock className="w-3 h-3" /> Plan Duration
                   </label>
                   <select 
-                    name="planType" 
-                    value={profile.planType}
+                    name="planDuration" 
+                    value={profile.planDuration}
                     onChange={handleProfileChange}
-                    className="w-full bg-transparent border-b border-[#E6E6E6] py-2 focus:border-[#1A1A1A] outline-none transition-all appearance-none focus:pl-1"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
                   >
                     <option value="Daily">Daily Plan</option>
                     <option value="Weekly">Weekly Plan</option>
                     <option value="Monthly">Monthly Plan</option>
-                    <option value="Morning">Morning Only</option>
-                    <option value="Evening">Evening Only</option>
-                    <option value="Night">Night Only</option>
                   </select>
                 </div>
 
                 <div className="space-y-2 group">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
-                    <Globe className="w-3 h-3" /> Select Month
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Utensils className="w-3 h-3" /> Meal Scope
+                  </label>
+                  <select 
+                    name="mealScope" 
+                    value={profile.mealScope}
+                    onChange={handleProfileChange}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
+                  >
+                    <option value="All Meals">All Meals (Full Day)</option>
+                    <option value="Morning Only">Morning Only</option>
+                    <option value="Lunch Only">Lunch Only</option>
+                    <option value="Evening Only">Evening Only</option>
+                    <option value="Dinner Only">Dinner Only</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2 group">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Calendar className="w-3 h-3" /> Select Month
                   </label>
                   <select 
                     name="month" 
                     value={profile.month}
                     onChange={handleProfileChange}
-                    className="w-full bg-transparent border-b border-[#E6E6E6] py-2 focus:border-[#1A1A1A] outline-none transition-all appearance-none focus:pl-1"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
                   >
                     {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
                       <option key={m} value={m}>{m}</option>
@@ -709,31 +879,297 @@ export default function App() {
                   </select>
                 </div>
 
-                <div className="space-y-4 md:col-span-2 mt-4">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-60 flex items-center gap-2">
-                    <Activity className="w-3 h-3" /> Health Conditions / Illnesses (Select Multiple)
+                <div className="space-y-2 group">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Utensils className="w-3 h-3" /> Dietary Preference
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {["Diabetes", "BP", "Thyroid", "Cholesterol", "PCOD/PCOS", "Uric Acid", "Anemia", "Digestive Issues"].map((illness) => (
-                      <button
-                        key={illness}
-                        onClick={() => {
-                          const currentIllnesses = profile.illnesses || [];
-                          const newIllnesses = currentIllnesses.includes(illness)
-                            ? currentIllnesses.filter(i => i !== illness)
-                            : [...currentIllnesses, illness];
-                          setProfile({ ...profile, illnesses: newIllnesses });
-                        }}
+                  <select 
+                    name="dietaryPreference" 
+                    value={profile.dietaryPreference}
+                    onChange={handleProfileChange}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
+                  >
+                    <option value="Non-Vegan">Non-Vegan</option>
+                    <option value="Vegan">Vegan</option>
+                    <option value="Jain">Jain</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2 group">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Activity className="w-3 h-3" /> Activity Level
+                  </label>
+                  <select 
+                    name="activityLevel" 
+                    value={profile.activityLevel}
+                    onChange={handleProfileChange}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
+                  >
+                    <option value="Sedentary">Sedentary / Light</option>
+                    <option value="Secondary">Secondary</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Heavy">Heavy</option>
+                    <option value="Others">Others</option>
+                  </select>
+                </div>
+
+                <div className="space-y-4 md:col-span-2 mt-4">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2">
+                    <AlertTriangle className="w-3 h-3" /> Allergies
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {["Peanuts", "Tree Nuts", "Milk", "Egg", "Wheat", "Soy", "Fish", "Shellfish", "Gluten", "Lactose"].map((allergy) => (
+                      <label 
+                        key={allergy} 
                         className={cn(
-                          "px-4 py-2 text-[10px] uppercase tracking-widest font-bold border rounded-sm transition-all flex items-center justify-between",
-                          (profile.illnesses || []).includes(illness)
-                            ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
-                            : "bg-transparent text-[#1A1A1A]/40 border-[#E6E6E6] hover:border-[#1A1A1A]"
+                          "flex items-center gap-2 p-3 border rounded-2xl cursor-pointer transition-all text-xs font-medium tracking-wide",
+                          profile.allergy.includes(allergy) 
+                            ? "bg-emerald-600 text-white border-emerald-600" 
+                            : "bg-transparent text-slate-900/40 border-slate-200 hover:border-emerald-600"
                         )}
                       >
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={profile.allergy.includes(allergy)}
+                          onChange={(e) => {
+                            const selectedValues = [...profile.allergy];
+                            if (e.target.checked) {
+                              selectedValues.push(allergy);
+                            } else {
+                              const index = selectedValues.indexOf(allergy);
+                              if (index > -1) selectedValues.splice(index, 1);
+                            }
+                            setProfile({ ...profile, allergy: selectedValues });
+                          }}
+                        />
+                        {allergy}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2 group">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Target className="w-3 h-3" /> Your Goal
+                  </label>
+                  <select 
+                    name="goal" 
+                    value={profile.goal}
+                    onChange={handleProfileChange}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
+                  >
+                    <option value="Weight Loss">Weight Loss</option>
+                    <option value="Muscle Gain">Muscle Gain</option>
+                    <option value="Support Energy">Support Energy (Energy Boost)</option>
+                    <option value="Better Digestion">Better Digestion (Gut Health)</option>
+                    <option value="Healthy Aging">Healthy Aging</option>
+                    <option value="Athletic Performance">Athletic Performance</option>
+                    <option value="General Wellness">General Wellness</option>
+                    <option value="Heart Health">Heart Health</option>
+                    <option value="Stress Management">Stress Management</option>
+                    <option value="Immunity Boost">Immunity Boost</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2 group relative">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Candy className="w-3 h-3" /> Taste Preference
+                  </label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsTasteDropdownOpen(!isTasteDropdownOpen)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
+                    >
+                      <div className="flex items-center gap-2 text-sm">
+                        {profile.tastePreference === "Meetha" && <Candy className="w-3.5 h-3.5 text-pink-400" />}
+                        {profile.tastePreference === "Teekha" && <Flame className="w-3.5 h-3.5 text-orange-500" />}
+                        {profile.tastePreference === "Namkeen" && <Waves className="w-3.5 h-3.5 text-blue-400" />}
+                        {profile.tastePreference === "Meetha-Teekha" && (
+                          <div className="flex -space-x-1">
+                            <Candy className="w-3.5 h-3.5 text-pink-400" />
+                            <Flame className="w-3.5 h-3.5 text-orange-500" />
+                          </div>
+                        )}
+                        {profile.tastePreference === "Meetha-Namkeen" && (
+                          <div className="flex -space-x-1">
+                            <Candy className="w-3.5 h-3.5 text-pink-400" />
+                            <Waves className="w-3.5 h-3.5 text-blue-400" />
+                          </div>
+                        )}
+                        {profile.tastePreference === "Teekha-Namkeen" && (
+                          <div className="flex -space-x-1">
+                            <Flame className="w-3.5 h-3.5 text-orange-500" />
+                            <Waves className="w-3.5 h-3.5 text-blue-400" />
+                          </div>
+                        )}
+                        {profile.tastePreference === "Combo" && <Layers className="w-3.5 h-3.5 text-purple-400" />}
+                        <span>
+                          {profile.tastePreference === "Meetha" && "Meetha (Sweet)"}
+                          {profile.tastePreference === "Teekha" && "Teekha (Spicy)"}
+                          {profile.tastePreference === "Namkeen" && "Namkeen (Salty)"}
+                          {profile.tastePreference === "Meetha-Teekha" && "Meetha & Teekha"}
+                          {profile.tastePreference === "Meetha-Namkeen" && "Meetha & Namkeen"}
+                          {profile.tastePreference === "Teekha-Namkeen" && "Teekha & Namkeen"}
+                          {profile.tastePreference === "Combo" && "Combo (All-in-One)"}
+                        </span>
+                      </div>
+                      <ChevronDown className={cn("w-3 h-3 transition-transform", isTasteDropdownOpen && "rotate-180")} />
+                    </button>
+
+                    <AnimatePresence>
+                      {isTasteDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute z-20 w-full mt-1 bg-white border border-slate-200 shadow-xl rounded-2xl overflow-hidden"
+                        >
+                          {[
+                            { value: "Meetha", label: "Meetha (Sweet)", icon: <Candy className="w-3.5 h-3.5 text-pink-400" /> },
+                            { value: "Teekha", label: "Teekha (Spicy)", icon: <Flame className="w-3.5 h-3.5 text-orange-500" /> },
+                            { value: "Namkeen", label: "Namkeen (Salty)", icon: <Waves className="w-3.5 h-3.5 text-blue-400" /> },
+                            { 
+                              value: "Meetha-Teekha", 
+                              label: "Meetha & Teekha", 
+                              icon: (
+                                <div className="flex -space-x-1">
+                                  <Candy className="w-3 h-3 text-pink-400" />
+                                  <Flame className="w-3 h-3 text-orange-500" />
+                                </div>
+                              ) 
+                            },
+                            { 
+                              value: "Meetha-Namkeen", 
+                              label: "Meetha & Namkeen", 
+                              icon: (
+                                <div className="flex -space-x-1">
+                                  <Candy className="w-3 h-3 text-pink-400" />
+                                  <Waves className="w-3 h-3 text-blue-400" />
+                                </div>
+                              ) 
+                            },
+                            { 
+                              value: "Teekha-Namkeen", 
+                              label: "Teekha & Namkeen", 
+                              icon: (
+                                <div className="flex -space-x-1">
+                                  <Flame className="w-3 h-3 text-orange-500" />
+                                  <Waves className="w-3 h-3 text-blue-400" />
+                                </div>
+                              ) 
+                            },
+                            { value: "Combo", label: "Combo (All-in-One)", icon: <Layers className="w-3.5 h-3.5 text-purple-400" /> },
+                          ].map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => {
+                                setProfile({ ...profile, tastePreference: opt.value as any });
+                                setIsTasteDropdownOpen(false);
+                              }}
+                              className={cn(
+                                "w-full px-4 py-3 text-left text-xs flex items-center gap-3 hover:bg-white shadow-sm rounded-2xl transition-colors",
+                                profile.tastePreference === opt.value && "bg-slate-100 font-bold"
+                              )}
+                            >
+                              {opt.icon}
+                              {opt.label}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                <div className="space-y-2 group">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Heart className="w-3 h-3" /> Marital Status
+                  </label>
+                  <select 
+                    name="maritalStatus" 
+                    value={profile.maritalStatus}
+                    onChange={handleProfileChange}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
+                  >
+                    <option value="Single">Single</option>
+                    <option value="Married">Married</option>
+                    <option value="Divorced">Divorced</option>
+                    <option value="Widowed">Widowed</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2 group">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Layers className="w-3 h-3" /> Derivative Preference
+                  </label>
+                  <select 
+                    name="derivativePreference" 
+                    value={profile.derivativePreference}
+                    onChange={handleProfileChange}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
+                  >
+                    <option value="Standard">Standard</option>
+                    <option value="Family-friendly">Family-friendly</option>
+                    <option value="Single-portion">Single-portion</option>
+                    <option value="Quick & Easy">Quick & Easy</option>
+                    <option value="Budget-friendly">Budget-friendly</option>
+                    <option value="High-Protein Focus">High-Protein Focus</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2 group">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2 group-focus-within:opacity-100 transition-opacity">
+                    <Sparkles className="w-3 h-3" /> Energy Add-on
+                  </label>
+                  <select 
+                    name="energyAddon" 
+                    value={profile.energyAddon}
+                    onChange={handleProfileChange}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm appearance-none"
+                  >
+                    <option value="None">None</option>
+                    <option value="Pre-workout">Pre-workout Boost</option>
+                    <option value="Post-workout">Post-workout Recovery</option>
+                    <option value="Afternoon Boost">Afternoon Energy Boost</option>
+                    <option value="Morning Kickstart">Morning Kickstart</option>
+                    <option value="Sustained Energy">Sustained Energy (All Day)</option>
+                  </select>
+                </div>
+                <div className="space-y-4 md:col-span-2 mt-4">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-2">
+                    <Activity className="w-3 h-3" /> Health Conditions / Illnesses
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {["Diabetes", "Hypertension (BP)", "Thyroid", "Cholesterol", "PCOD/PCOS", "Uric Acid", "Anemia", "Digestive Issues", "Kidney Issues", "Fatty Liver", "Heart Disease", "Arthritis"].map((illness) => (
+                      <label 
+                        key={illness} 
+                        className={cn(
+                          "flex items-center gap-2 p-3 border rounded-2xl cursor-pointer transition-all text-xs font-medium tracking-wide",
+                          profile.illnesses.includes(illness) 
+                            ? "bg-emerald-600 text-white border-emerald-600" 
+                            : "bg-transparent text-slate-900/40 border-slate-200 hover:border-emerald-600"
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={profile.illnesses.includes(illness)}
+                          onChange={(e) => {
+                            const selectedValues = [...profile.illnesses];
+                            if (e.target.checked) {
+                              selectedValues.push(illness);
+                            } else {
+                              const index = selectedValues.indexOf(illness);
+                              if (index > -1) selectedValues.splice(index, 1);
+                            }
+                            setProfile({ ...profile, illnesses: selectedValues });
+                          }}
+                        />
                         {illness}
-                        {(profile.illnesses || []).includes(illness) && <Check className="w-3 h-3 ml-2" />}
-                      </button>
+                      </label>
                     ))}
                   </div>
                 </div>
@@ -744,15 +1180,15 @@ export default function App() {
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-8 p-4 bg-[#FAFAFA] border border-[#E6E6E6] rounded-sm grid grid-cols-2 gap-4"
+                  className="mt-8 p-4 bg-white shadow-sm rounded-2xl border border-slate-200 rounded-2xl grid grid-cols-2 gap-4"
                 >
                   <div className="space-y-1">
-                    <p className="text-[8px] uppercase tracking-widest font-bold opacity-40">Calculated BMI</p>
-                    <p className="text-lg font-serif italic">{bmi.toFixed(1)}</p>
+                    <p className="text-[10px] font-semibold tracking-wide uppercase opacity-40">Calculated BMI</p>
+                    <p className="text-lg font-sans font-semibold tracking-tight text-slate-900">{bmi.toFixed(1)}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[8px] uppercase tracking-widest font-bold opacity-40">Est. Body Fat %</p>
-                    <p className="text-lg font-serif italic">{bodyFat > 0 ? bodyFat.toFixed(1) : "0.0"}%</p>
+                    <p className="text-[10px] font-semibold tracking-wide uppercase opacity-40">Est. Body Fat %</p>
+                    <p className="text-lg font-sans font-semibold tracking-tight text-slate-900">{bodyFat > 0 ? bodyFat.toFixed(1) : "0.0"}%</p>
                   </div>
                 </motion.div>
               )}
@@ -761,29 +1197,30 @@ export default function App() {
                 <button 
                   onClick={handleGeneratePlan}
                   disabled={isGeneratingPlan}
-                  className="flex-1 py-4 bg-[#1A1A1A] text-white text-xs uppercase tracking-[0.2em] font-bold hover:bg-[#333] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm hover:shadow-md"
+                  className="flex-1 py-4 bg-emerald-600 text-white text-sm font-semibold tracking-wide rounded-2xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-md hover:shadow-lg"
                 >
                   {isGeneratingPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : "Generate Plan"}
                 </button>
                 <button 
                   onClick={handleGenerateRecipe}
                   disabled={isGeneratingRecipe}
-                  className="flex-1 py-4 border border-[#1A1A1A] text-[#1A1A1A] text-xs uppercase tracking-[0.2em] font-bold hover:bg-[#1A1A1A] hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-30 shadow-sm hover:shadow-md"
+                  className="flex-1 py-4 border-2 border-emerald-600 text-emerald-700 text-sm font-semibold tracking-wide rounded-2xl hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm hover:shadow-md"
                 >
                   {isGeneratingRecipe ? <Loader2 className="w-4 h-4 animate-spin" /> : "Get Recipe"}
                 </button>
               </div>
 
               {/* Saved Profiles Section */}
-              <div className="mt-12 pt-12 border-t border-[#F0F0F0]">
+              <div className="mt-12 pt-12 border-t border-slate-100">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-[10px] uppercase tracking-widest font-bold opacity-40">Saved Profiles</h3>
+                  <h3 className="text-xs font-medium text-slate-400 mb-1.5">Saved Profiles</h3>
                   <button 
                     onClick={handleSaveProfile}
                     disabled={!profile.name}
-                    className="text-[10px] uppercase tracking-widest font-bold text-[#1A1A1A] hover:opacity-60 transition-opacity disabled:opacity-20"
+                    className="text-xs font-medium tracking-wide text-slate-900 hover:opacity-60 transition-opacity disabled:opacity-20 flex items-center gap-1.5"
                   >
-                    + Save Current
+                    <Save className="w-3 h-3" />
+                    Save Current
                   </button>
                 </div>
                 
@@ -792,7 +1229,7 @@ export default function App() {
                 ) : (
                   <div className="space-y-2">
                     {savedProfiles.map((p, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 bg-[#FAFAFA] border border-[#F0F0F0] rounded-sm group hover:border-[#1A1A1A] transition-colors">
+                      <div key={idx} className="flex items-center justify-between p-3 bg-white shadow-sm rounded-2xl border border-slate-100 rounded-2xl group hover:border-emerald-600 transition-colors">
                         <div 
                           className="flex-1 cursor-pointer"
                           onClick={() => handleLoadProfile(p)}
@@ -820,23 +1257,39 @@ export default function App() {
         </div>
 
         {/* Right Panel: Results */}
-        <div className="lg:col-span-7 bg-white p-8 lg:p-16 overflow-y-auto">
+        <div className="bg-white p-8 lg:p-16 overflow-y-auto lg:col-span-12">
+          {activeTab === "home" && (
+            <div className="space-y-12 mb-12">
+              {/* Profile Section */}
+              <section>
+                <div className="flex items-center gap-2 mb-8">
+                  <span className="text-[10px] uppercase tracking-wider font-bold opacity-40">01</span>
+                  <h2 className="text-xl font-sans font-semibold tracking-tight text-slate-900">Your Profile</h2>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* ... profile inputs ... */}
+                  {/* I will need to copy the profile inputs here */}
+                </div>
+              </section>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             <motion.div 
               key={activeTab}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="prose prose-sm max-w-none prose-headings:font-serif prose-headings:italic prose-headings:font-normal prose-p:text-[#1A1A1A]/70 prose-p:leading-relaxed prose-li:text-[#1A1A1A]/70 h-full"
+              className="prose prose-sm max-w-none prose-headings:font-serif prose-headings:italic prose-headings:font-normal prose-p:text-slate-600 prose-p:leading-relaxed prose-li:text-slate-600 h-full"
             >
               {activeTab === "plan" && (
                 <>
                   {!dietPlan && !currentRecipe && !isGeneratingPlan && !isGeneratingRecipe ? (
                     <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto pt-20">
-                      <div className="w-16 h-16 border border-[#E6E6E6] rounded-full flex items-center justify-center mb-8">
+                      <div className="w-16 h-16 border border-slate-200 rounded-full flex items-center justify-center mb-8">
                         <Utensils className="w-6 h-6 opacity-20" />
                       </div>
-                      <h3 className="text-2xl font-serif italic mb-4">Your personalized guide awaits.</h3>
+                      <h3 className="text-2xl font-sans font-semibold tracking-tight text-slate-900 mb-4">Your personalized guide awaits.</h3>
                       <p className="text-sm leading-relaxed opacity-40">
                         Fill in your profile to receive a custom diet plan tailored to your lifestyle.
                       </p>
@@ -844,26 +1297,26 @@ export default function App() {
                   ) : (
                     <>
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                        <h2 className="text-3xl font-serif italic m-0">Your Personalized Plan</h2>
+                        <h2 className="text-3xl font-sans font-semibold tracking-tight text-slate-900 m-0">Your Personalized Plan</h2>
                         {dietPlan && (
                           <div className="flex items-center gap-2 flex-wrap">
                             <button 
                               onClick={handleDownloadPDF}
-                              className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#E6E6E6] hover:border-[#1A1A1A] transition-all text-[10px] uppercase tracking-widest font-bold text-[#1A1A1A]"
+                              className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 hover:border-emerald-600 transition-all text-xs font-medium tracking-wide text-slate-900"
                             >
                               <Download className="w-3 h-3" />
                               <span className="hidden sm:inline">Download PDF</span>
                             </button>
                             <button 
                               onClick={handleSharePDF}
-                              className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#E6E6E6] hover:border-[#1A1A1A] transition-all text-[10px] uppercase tracking-widest font-bold text-[#1A1A1A]"
+                              className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 hover:border-emerald-600 transition-all text-xs font-medium tracking-wide text-slate-900"
                             >
                               <Share2 className="w-3 h-3" />
                               <span className="hidden sm:inline">Share</span>
                             </button>
                             <button 
                               onClick={handleShareToWhatsAppWeb}
-                              className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#E6E6E6] hover:border-[#1A1A1A] transition-all text-[10px] uppercase tracking-widest font-bold text-[#1A1A1A]"
+                              className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 hover:border-emerald-600 transition-all text-xs font-medium tracking-wide text-slate-900"
                             >
                               <MessageCircle className="w-3 h-3" />
                               <span className="hidden sm:inline">WhatsApp</span>
@@ -871,14 +1324,14 @@ export default function App() {
                             <button 
                               onClick={toggleFavoritePlan}
                               className={cn(
-                                "flex items-center gap-2 px-4 py-2 rounded-full border transition-all text-[10px] uppercase tracking-widest font-bold",
-                                favoritePlans.some(p => p.id === `${profile.name}_${profile.month}_${profile.planType}`)
-                                  ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
-                                  : "bg-transparent text-[#1A1A1A] border-[#E6E6E6] hover:border-[#1A1A1A]"
+                                "flex items-center gap-2 px-4 py-2 rounded-full border transition-all text-xs font-medium tracking-wide",
+                                favoritePlans.some(p => p.id === `${profile.name}_${profile.month}_${profile.planDuration}_${profile.mealScope}`)
+                                  ? "bg-emerald-600 text-white border-emerald-600"
+                                  : "bg-transparent text-slate-900 border-slate-200 hover:border-emerald-600"
                               )}
                             >
-                              <Heart className={cn("w-3 h-3", favoritePlans.some(p => p.id === `${profile.name}_${profile.month}_${profile.planType}`) && "fill-current")} />
-                              <span className="hidden sm:inline">{favoritePlans.some(p => p.id === `${profile.name}_${profile.month}_${profile.planType}`) ? "Favorited" : "Add to Favorites"}</span>
+                              <Heart className={cn("w-3 h-3", favoritePlans.some(p => p.id === `${profile.name}_${profile.month}_${profile.planDuration}_${profile.mealScope}`) && "fill-current")} />
+                              <span className="hidden sm:inline">{favoritePlans.some(p => p.id === `${profile.name}_${profile.month}_${profile.planDuration}_${profile.mealScope}`) ? "Favorited" : "Add to Favorites"}</span>
                             </button>
                           </div>
                         )}
@@ -887,28 +1340,44 @@ export default function App() {
                         {(isGeneratingPlan || isGeneratingRecipe) && (
                           <div className="py-20 flex flex-col items-center justify-center text-center">
                             <Loader2 className="w-8 h-8 animate-spin mb-4 opacity-20" />
-                            <p className="text-[10px] uppercase tracking-widest font-bold opacity-40">
+                            <p className="text-xs font-medium text-slate-400 mb-1.5">
                               {isGeneratingPlan ? "Generating your custom plan..." : "Creating recipe..."}
                             </p>
                           </div>
                         )}
                         {!isGeneratingPlan && dietPlan && (
                       <div className="space-y-12">
-                        <div className="markdown-content prose prose-sm max-w-none prose-headings:font-serif prose-headings:italic prose-headings:font-normal prose-p:text-[#1A1A1A]/70 prose-p:leading-relaxed prose-li:text-[#1A1A1A]/70">
-                          <ReactMarkdown>{dietPlan.planMarkdown}</ReactMarkdown>
+                        <div className="markdown-content prose prose-sm max-w-none prose-headings:font-serif prose-headings:italic prose-headings:font-normal prose-p:text-slate-600 prose-p:leading-relaxed prose-li:text-slate-600">
+                          <ReactMarkdown
+                            components={{
+                              h3: ({node, ...props}) => {
+                                const isWarning = props.children?.toString().includes('⚠️');
+                                return <h3 className={isWarning ? 'warning-heading' : ''} {...props} />;
+                              }
+                            }}
+                          >
+                            {dietPlan.planMarkdown}
+                          </ReactMarkdown>
+                        </div>
+
+                        <div className="p-4 bg-red-50/30 border border-red-100 rounded-2xl flex gap-3 mt-8">
+                          <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                          <p className="text-[10px] leading-relaxed text-red-800/70 italic">
+                            <strong>Medical Disclaimer:</strong> This AI-generated diet plan is for informational and educational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.
+                          </p>
                         </div>
 
                         {dietPlan.recommendedFoods && dietPlan.recommendedFoods.length > 0 && (
-                          <div className="space-y-8 pt-12 border-t border-[#E6E6E6]">
+                          <div className="space-y-8 pt-12 border-t border-slate-200">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-[#1A1A1A] rounded-full flex items-center justify-center">
+                                <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center">
                                   <Sparkles className="text-white w-4 h-4" />
                                 </div>
-                                <h3 className="text-2xl font-serif italic">Recommended Foods Gallery</h3>
+                                <h3 className="text-2xl font-sans font-semibold tracking-tight text-slate-900">Recommended Foods Gallery</h3>
                               </div>
                               <div className="flex items-center gap-4">
-                                <span className="text-[10px] uppercase tracking-widest font-bold opacity-30">AI Generated Reference</span>
+                                <span className="text-xs font-medium tracking-wide opacity-30">AI Generated Reference</span>
                               </div>
                             </div>
                             <p className="text-sm opacity-40 max-w-md">
@@ -922,7 +1391,7 @@ export default function App() {
                                   initial={{ opacity: 0, y: 10 }}
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={{ delay: idx * 0.01 }}
-                                  className="group relative aspect-square bg-[#FAFAFA] border border-[#E6E6E6] rounded-sm overflow-hidden cursor-pointer"
+                                  className="group relative aspect-square bg-white shadow-sm rounded-2xl border border-slate-200 rounded-2xl overflow-hidden cursor-pointer"
                                   onClick={() => handleGenerateAiFoodImage(food.name)}
                                 >
                                   {aiImages[food.name] ? (
@@ -939,7 +1408,7 @@ export default function App() {
                                       ) : (
                                         <div className="flex flex-col items-center gap-2">
                                           <Camera className="w-4 h-4 opacity-10 group-hover:opacity-40 transition-opacity" />
-                                          <span className="text-[8px] uppercase tracking-widest font-bold opacity-20 group-hover:opacity-60 transition-opacity">
+                                          <span className="text-[10px] font-semibold tracking-wide uppercase opacity-20 group-hover:opacity-60 transition-opacity">
                                             {aiImages[food.name] === undefined && isGeneratingAiImage[food.name] === false && lastQuotaErrorTime.current > 0 ? "Retry AI Image" : "Generate AI Image"}
                                           </span>
                                         </div>
@@ -964,7 +1433,7 @@ export default function App() {
                     )}
                     {!isGeneratingRecipe && currentRecipe && (
                       <div className="mt-12">
-                        <h3 className="text-2xl font-serif italic mb-6">Featured Recipe</h3>
+                        <h3 className="text-2xl font-sans font-semibold tracking-tight text-slate-900 mb-6">Featured Recipe</h3>
                         <RecipeCard 
                           recipe={currentRecipe} 
                           isFavorite={favorites.some(f => f.id === currentRecipe.id)}
@@ -972,6 +1441,8 @@ export default function App() {
                           imageUrl={aiImages[currentRecipe.title]}
                           onGenerateImage={handleGenerateAiFoodImage}
                           isGeneratingImage={isGeneratingAiImage[currentRecipe.title]}
+                          onAnalyzeNutrition={handleAnalyzeNutrition}
+                          isAnalyzingNutrition={isAnalyzingNutrition[currentRecipe.id]}
                         />
                       </div>
                     )}
@@ -984,11 +1455,11 @@ export default function App() {
           {activeTab === "analyze" && (
                   <div className="space-y-8">
                     <div className="flex items-center justify-between mb-8">
-                      <h2 className="text-3xl font-serif italic m-0">Food Analysis</h2>
+                      <h2 className="text-3xl font-sans font-semibold tracking-tight text-slate-900 m-0">Food Analysis</h2>
                     </div>
                     {!nutritionInfo && !isAnalyzingImage && (
                       <div className="max-w-xl">
-                        <h3 className="text-xl font-serif italic mb-4">Upload a photo to analyze nutrition</h3>
+                        <h3 className="text-xl font-sans font-semibold tracking-tight text-slate-900 mb-4">Upload a photo to analyze nutrition</h3>
                         <p className="text-sm opacity-60 mb-8 leading-relaxed">
                           Our AI will identify the food items, estimate portion sizes, and provide a detailed nutritional breakdown including calories, macros, and health insights.
                         </p>
@@ -996,19 +1467,19 @@ export default function App() {
                         <motion.div 
                           whileHover={{ scale: 1.005 }}
                           onClick={() => fileInputRef.current?.click()}
-                          className="group relative aspect-video border border-dashed border-[#E6E6E6] rounded-sm flex flex-col items-center justify-center cursor-pointer hover:border-[#1A1A1A] transition-all overflow-hidden bg-[#FAFAFA]"
+                          className="group relative aspect-video border border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-emerald-600 transition-all overflow-hidden bg-white shadow-sm rounded-2xl"
                         >
                           {selectedImage ? (
                             <>
                               <img src={selectedImage} alt="Selected food" className="w-full h-full object-cover" />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <p className="text-white text-[10px] uppercase tracking-widest font-bold">Change Image</p>
+                                <p className="text-white text-xs font-medium tracking-wide">Change Image</p>
                               </div>
                             </>
                           ) : (
                             <>
                               <Upload className="w-6 h-6 mb-3 opacity-20 group-hover:opacity-100 transition-all group-hover:-translate-y-1" />
-                              <p className="text-[10px] uppercase tracking-widest font-bold opacity-40 group-hover:opacity-100 transition-opacity">Upload Food Photo</p>
+                              <p className="text-xs font-medium text-slate-400 mb-1.5 group-hover:opacity-100 transition-opacity">Upload Food Photo</p>
                             </>
                           )}
                           <input 
@@ -1025,7 +1496,7 @@ export default function App() {
                           whileTap={{ scale: 0.99 }}
                           onClick={handleAnalyzeImage}
                           disabled={!selectedImage || isAnalyzingImage}
-                          className="mt-6 w-full py-4 bg-[#1A1A1A] text-white text-xs uppercase tracking-[0.2em] font-bold hover:bg-[#333] transition-all flex items-center justify-center gap-2 disabled:opacity-30 shadow-sm hover:shadow-md"
+                          className="mt-6 w-full py-4 bg-emerald-600 text-white text-sm font-semibold tracking-wide hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-30 shadow-sm hover:shadow-md"
                         >
                           {isAnalyzingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : "Analyze Nutrition"}
                         </motion.button>
@@ -1035,7 +1506,7 @@ export default function App() {
                     {isAnalyzingImage && (
                       <div className="py-20 flex flex-col items-center justify-center text-center">
                         <Loader2 className="w-8 h-8 animate-spin mb-4 opacity-20" />
-                        <p className="text-[10px] uppercase tracking-widest font-bold opacity-40">Analyzing your meal...</p>
+                        <p className="text-xs font-medium text-slate-400 mb-1.5">Analyzing your meal...</p>
                       </div>
                     )}
 
@@ -1048,13 +1519,22 @@ export default function App() {
                         <div className="flex justify-end mb-4">
                           <button 
                             onClick={() => { setNutritionInfo(null); setSelectedImage(null); }}
-                            className="text-[10px] uppercase tracking-widest font-bold opacity-40 hover:opacity-100 transition-opacity"
+                            className="text-xs font-medium text-slate-400 mb-1.5 hover:opacity-100 transition-opacity"
                           >
                             ← Analyze Another
                           </button>
                         </div>
-                        <div className="bg-[#FAFAFA] p-8 border border-[#F0F0F0] rounded-sm markdown-content">
-                          <ReactMarkdown>{nutritionInfo}</ReactMarkdown>
+                        <div className="bg-white shadow-sm rounded-2xl p-8 border border-slate-100 rounded-2xl markdown-content">
+                          <ReactMarkdown
+                            components={{
+                              h3: ({node, ...props}) => {
+                                const isWarning = props.children?.toString().includes('⚠️');
+                                return <h3 className={isWarning ? 'warning-heading' : ''} {...props} />;
+                              }
+                            }}
+                          >
+                            {nutritionInfo}
+                          </ReactMarkdown>
                         </div>
                       </motion.div>
                     )}
@@ -1064,26 +1544,26 @@ export default function App() {
                 {activeTab === "favorites" && (
                   <div className="space-y-12">
                     <div className="flex items-center justify-between mb-8">
-                      <h2 className="text-3xl font-serif italic m-0">Saved Favorites</h2>
+                      <h2 className="text-3xl font-sans font-semibold tracking-tight text-slate-900 m-0">Saved Favorites</h2>
                     </div>
                     {favoritePlans.length > 0 && (
                       <div className="space-y-6">
-                        <h3 className="text-[10px] uppercase tracking-widest font-bold opacity-40">Saved Diet Plans</h3>
+                        <h3 className="text-xs font-medium text-slate-400 mb-1.5">Saved Diet Plans</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {favoritePlans.map((fp) => (
                             <div 
                               key={fp.id}
-                              className="p-6 bg-[#FAFAFA] border border-[#F0F0F0] rounded-sm group hover:border-[#1A1A1A] transition-all cursor-pointer"
+                              className="p-6 bg-white shadow-sm rounded-2xl border border-slate-100 rounded-2xl group hover:border-emerald-600 transition-all cursor-pointer"
                               onClick={() => {
                                 setDietPlan(fp.plan);
-                                setProfile(fp.profile);
+                                handleLoadProfile(fp.profile);
                                 setActiveTab("plan");
                               }}
                             >
                               <div className="flex justify-between items-start mb-4">
                                 <div>
-                                  <p className="text-lg font-serif italic m-0">{fp.profile.name}'s Plan</p>
-                                  <p className="text-[8px] uppercase tracking-widest opacity-40 mt-1">{fp.profile.planType} • {fp.profile.month} • {fp.date}</p>
+                                  <p className="text-lg font-sans font-semibold tracking-tight text-slate-900 m-0">{fp.profile.name}'s Plan</p>
+                                  <p className="text-[8px] uppercase tracking-widest opacity-40 mt-1">{fp.profile.planDuration} • {fp.profile.mealScope} • {fp.profile.month} • {fp.date}</p>
                                 </div>
                                 <button 
                                   onClick={(e) => {
@@ -1092,7 +1572,7 @@ export default function App() {
                                     setFavoritePlans(newFavoritePlans);
                                     localStorage.setItem("diet_advisor_favorite_plans", JSON.stringify(newFavoritePlans));
                                   }}
-                                  className="text-[#1A1A1A]/40 hover:text-red-600 transition-colors"
+                                  className="text-slate-900/40 hover:text-red-600 transition-colors"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -1106,7 +1586,7 @@ export default function App() {
 
                     {favorites.length > 0 && (
                       <div className="space-y-6">
-                        <h3 className="text-[10px] uppercase tracking-widest font-bold opacity-40">Saved Recipes</h3>
+                        <h3 className="text-xs font-medium text-slate-400 mb-1.5">Saved Recipes</h3>
                         <div className="grid grid-cols-1 gap-8">
                           {favorites.map(recipe => (
                             <RecipeCard 
@@ -1117,6 +1597,8 @@ export default function App() {
                               imageUrl={aiImages[recipe.title]}
                               onGenerateImage={handleGenerateAiFoodImage}
                               isGeneratingImage={isGeneratingAiImage[recipe.title]}
+                              onAnalyzeNutrition={handleAnalyzeNutrition}
+                              isAnalyzingNutrition={isAnalyzingNutrition[recipe.id]}
                             />
                           ))}
                         </div>
@@ -1126,31 +1608,196 @@ export default function App() {
                     {favoritePlans.length === 0 && favorites.length === 0 && (
                       <div className="py-20 text-center opacity-30">
                         <Heart className="w-12 h-12 mx-auto mb-4" />
-                        <p className="font-serif italic text-xl">No favorites saved yet</p>
+                        <p className="font-sans font-semibold tracking-tight text-slate-900 text-xl">No favorites saved yet</p>
                       </div>
                     )}
                   </div>
                 )}
-              </motion.div>
+                {activeTab === "tracker" && (
+                <div className="h-full flex flex-col pt-10">
+                  <div className="flex items-center gap-3 mb-12">
+                    <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center">
+                      <Droplets className="text-white w-5 h-5" />
+                    </div>
+                    <h2 className="text-3xl font-sans font-semibold tracking-tight text-slate-900 m-0">Daily Water Tracker</h2>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                    <div className="space-y-8">
+                      <div className="p-8 bg-white shadow-sm rounded-2xl border border-slate-200 rounded-2xl text-center">
+                        <p className="text-xs font-medium text-slate-400 mb-1.5 mb-4">Current Intake</p>
+                        <div className="flex items-center justify-center gap-8">
+                          <button 
+                            onClick={() => setWaterIntake(Math.max(0, waterIntake - 1))}
+                            className="w-12 h-12 border border-slate-200 rounded-full flex items-center justify-center hover:border-emerald-600 transition-all"
+                          >
+                            <Minus className="w-5 h-5" />
+                          </button>
+                          <div className="space-y-1">
+                            <p className="text-5xl font-sans font-semibold tracking-tight text-slate-900">{waterIntake}</p>
+                            <p className="text-xs font-medium text-slate-400 mb-1.5">Glasses</p>
+                          </div>
+                          <button 
+                            onClick={() => setWaterIntake(waterIntake + 1)}
+                            className="w-12 h-12 border border-slate-200 rounded-full flex items-center justify-center hover:border-emerald-600 transition-all"
+                          >
+                            <Plus className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-end">
+                          <p className="text-xs font-medium text-slate-400 mb-1.5">Daily Goal</p>
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="number" 
+                              value={waterGoal}
+                              onChange={(e) => setWaterGoal(parseInt(e.target.value) || 0)}
+                              className="w-12 bg-transparent border-b-2 border-slate-200 text-center font-sans font-semibold tracking-tight text-slate-900 focus:border-emerald-500 outline-none transition-colors"
+                            />
+                            <span className="text-xs font-medium text-slate-400 mb-1.5">Glasses</span>
+                          </div>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(100, (waterIntake / (waterGoal || 1)) * 100)}%` }}
+                            className="h-full bg-emerald-600"
+                          />
+                        </div>
+                        <p className="text-[10px] italic opacity-40 text-right">
+                          {waterIntake >= waterGoal ? "Goal reached! Stay hydrated." : `${waterGoal - waterIntake} more glasses to reach your goal.`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <h4 className="text-sm font-bold uppercase tracking-widest">Why Hydration Matters</h4>
+                      <ul className="space-y-4">
+                        <li className="flex gap-3 text-sm leading-relaxed opacity-60">
+                          <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full mt-1.5 flex-shrink-0" />
+                          <span>Boosts energy levels and brain function.</span>
+                        </li>
+                        <li className="flex gap-3 text-sm leading-relaxed opacity-60">
+                          <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full mt-1.5 flex-shrink-0" />
+                          <span>Aids in digestion and weight management.</span>
+                        </li>
+                        <li className="flex gap-3 text-sm leading-relaxed opacity-60">
+                          <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full mt-1.5 flex-shrink-0" />
+                          <span>Improves skin health and complexion.</span>
+                        </li>
+                        <li className="flex gap-3 text-sm leading-relaxed opacity-60">
+                          <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full mt-1.5 flex-shrink-0" />
+                          <span>Regulates body temperature and joint lubrication.</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {activeTab === "history" && (
+                <div className="space-y-12 pt-10">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center">
+                        <History className="text-white w-5 h-5" />
+                      </div>
+                      <h2 className="text-3xl font-sans font-semibold tracking-tight text-slate-900 m-0">Generation History</h2>
+                    </div>
+                    {planHistory.length > 0 && (
+                      <button 
+                        onClick={() => {
+                          if (confirm("Are you sure you want to clear your entire generation history?")) {
+                            setPlanHistory([]);
+                            localStorage.removeItem("diet_advisor_plan_history");
+                          }
+                        }}
+                        className="text-xs font-medium text-slate-400 mb-1.5 hover:opacity-100 transition-opacity flex items-center gap-2"
+                      >
+                        <Trash2 className="w-3 h-3" /> Clear All
+                      </button>
+                    )}
+                  </div>
+
+                  {planHistory.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {planHistory.map((item) => (
+                        <div 
+                          key={item.id}
+                          className="p-6 bg-white shadow-sm rounded-2xl border border-slate-100 rounded-2xl group hover:border-emerald-600 transition-all cursor-pointer relative"
+                          onClick={() => {
+                            setDietPlan(item.plan);
+                            handleLoadProfile(item.profile);
+                            setActiveTab("plan");
+                          }}
+                        >
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <p className="text-lg font-sans font-semibold tracking-tight text-slate-900 m-0">{item.profile.name || "Guest"}'s Plan</p>
+                              <p className="text-[8px] uppercase tracking-widest opacity-40 mt-1">{item.profile.planDuration} • {item.profile.goal} • {item.date}</p>
+                            </div>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newHistory = planHistory.filter(h => h.id !== item.id);
+                                setPlanHistory(newHistory);
+                                localStorage.setItem("diet_advisor_plan_history", JSON.stringify(newHistory));
+                              }}
+                              className="text-slate-900/40 hover:text-red-600 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-[10px] opacity-60 line-clamp-3 leading-relaxed">
+                              {item.plan.planMarkdown.substring(0, 150)}...
+                            </p>
+                            <div className="flex flex-wrap gap-1 pt-2">
+                              {item.profile.illnesses && item.profile.illnesses.slice(0, 2).map(ill => (
+                                <span key={ill} className="px-2 py-0.5 bg-red-50 text-red-600 text-[7px] uppercase tracking-widest font-bold rounded-full">
+                                  {ill}
+                                </span>
+                              ))}
+                              {item.profile.illnesses && item.profile.illnesses.length > 2 && (
+                                <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[7px] uppercase tracking-widest font-bold rounded-full">
+                                  +{item.profile.illnesses.length - 2} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-20 text-center opacity-30 border border-dashed border-slate-200 rounded-2xl">
+                      <History className="w-12 h-12 mx-auto mb-4" />
+                      <p className="font-sans font-semibold tracking-tight text-slate-900 text-xl">No history yet</p>
+                      <p className="text-xs font-medium tracking-wide mt-2">Generate a plan to see it here</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
           </AnimatePresence>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-[#E6E6E6] py-12 px-8">
+      <footer className="border-t border-slate-200 py-12 px-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 opacity-20" />
-            <p className="text-[10px] uppercase tracking-[0.2em] font-bold opacity-40">© 2026 Early Diet Advisor</p>
+            <p className="text-[10px] uppercase tracking-wider font-bold opacity-40">© 2026 Diet Advisor</p>
           </div>
           <div className="flex gap-12">
             <div className="space-y-2">
-              <p className="text-[10px] uppercase tracking-widest font-bold opacity-60">Powered By</p>
-              <p className="text-xs font-serif italic">Google Gemini AI</p>
+              <p className="text-xs font-medium text-slate-500 mb-1.5">Powered By</p>
+              <p className="text-xs font-sans font-semibold tracking-tight text-slate-900">Google Gemini AI</p>
             </div>
             <div className="space-y-2">
-              <p className="text-[10px] uppercase tracking-widest font-bold opacity-60">Design</p>
-              <p className="text-xs font-serif italic">Classic Minimalist</p>
+              <p className="text-xs font-medium text-slate-500 mb-1.5">Design</p>
+              <p className="text-xs font-sans font-semibold tracking-tight text-slate-900">Classic Minimalist</p>
             </div>
           </div>
         </div>
@@ -1166,12 +1813,12 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95 }}
               className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full"
             >
-              <h3 className="text-lg font-serif italic mb-2">Notice</h3>
+              <h3 className="text-lg font-sans font-semibold tracking-tight text-slate-900 mb-2">Notice</h3>
               <p className="text-sm opacity-70 mb-6">{validationMessage}</p>
               <div className="flex justify-end">
                 <button
                   onClick={() => setValidationMessage(null)}
-                  className="px-4 py-2 bg-[#1A1A1A] text-white text-xs uppercase tracking-widest font-bold rounded-sm"
+                  className="px-4 py-2 bg-emerald-600 text-white text-xs uppercase tracking-widest font-bold rounded-2xl"
                 >
                   Close
                 </button>
@@ -1191,14 +1838,14 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95 }}
               className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full"
             >
-              <h3 className="text-lg font-serif italic mb-2 text-red-600">Quota Exceeded</h3>
+              <h3 className="text-lg font-sans font-semibold tracking-tight text-slate-900 mb-2 text-red-600">Quota Exceeded</h3>
               <p className="text-sm opacity-70 mb-6">
                 AI generation quota exceeded. Would you like to use your own Gemini API key to continue? (Requires a paid Google Cloud project)
               </p>
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setQuotaModalOpen(false)}
-                  className="px-4 py-2 border border-[#E6E6E6] text-[#1A1A1A] text-xs uppercase tracking-widest font-bold rounded-sm hover:bg-[#F5F5F5]"
+                  className="px-4 py-2 border border-slate-200 text-slate-900 text-xs uppercase tracking-widest font-bold rounded-2xl hover:bg-slate-100"
                 >
                   Cancel
                 </button>
@@ -1207,13 +1854,64 @@ export default function App() {
                     setQuotaModalOpen(false);
                     handleOpenKeyDialog();
                   }}
-                  className="px-4 py-2 bg-[#1A1A1A] text-white text-xs uppercase tracking-widest font-bold rounded-sm"
+                  className="px-4 py-2 bg-emerald-600 text-white text-xs uppercase tracking-widest font-bold rounded-2xl"
                 >
                   Use My Key
                 </button>
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Save Confirmation Modal */}
+      <AnimatePresence>
+        {saveConfirmationOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200"
+            >
+              <div className="flex items-center gap-3 mb-6 text-orange-500">
+                <AlertTriangle className="w-6 h-6" />
+                <h3 className="text-xl font-sans font-semibold tracking-tight text-slate-900">Overwrite Profile?</h3>
+              </div>
+              <p className="text-sm leading-relaxed opacity-60 mb-8">
+                A profile with the name <span className="font-bold text-slate-900">"{profile.name}"</span> already exists. Do you want to overwrite it with the current data?
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={performSaveProfile}
+                  className="w-full py-3 bg-emerald-600 text-white text-xs font-medium tracking-wide rounded-2xl hover:bg-emerald-700 transition-colors"
+                >
+                  Yes, Overwrite
+                </button>
+                <button
+                  onClick={() => setSaveConfirmationOpen(false)}
+                  className="w-full py-3 border border-slate-200 text-slate-900 text-xs font-medium tracking-wide rounded-2xl hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Success Toast */}
+      <AnimatePresence>
+        {saveSuccessMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] bg-emerald-600 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 min-w-[300px]"
+          >
+            <CheckCircle className="w-5 h-5 text-green-400" />
+            <p className="text-xs font-bold uppercase tracking-widest">{saveSuccessMessage}</p>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
